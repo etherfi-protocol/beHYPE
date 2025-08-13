@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {UUPSProxy} from "../src/lib/UUPSProxy.sol";
+import {BeHYPE} from "../src/BeHYPE.sol";
+import {RoleRegistry} from "../src/RoleRegistry.sol";
+import "forge-std/console.sol";
+
+contract BaseTest is Test {
+    BeHYPE public beHYPE;
+    RoleRegistry public roleRegistry;
+
+    address public admin = makeAddr("admin");
+    address public minter = makeAddr("minter");
+    address public burner = makeAddr("burner");
+    address public user = makeAddr("user");
+    address public user2 = makeAddr("user2");
+
+    function _getProxyImplementation(address proxy) internal view returns (address) {
+        bytes32 implSlot = vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT);
+        return address(uint160(uint256(implSlot)));
+    }
+
+    function setUp() public virtual {
+        BeHYPE beHYPEImpl = new BeHYPE();
+        RoleRegistry roleRegistryImpl = new RoleRegistry();
+
+        roleRegistry = RoleRegistry(address(new UUPSProxy(
+            address(roleRegistryImpl),
+            abi.encodeWithSelector(RoleRegistry.initialize.selector, admin)
+        )));
+
+        beHYPE = BeHYPE(address(new UUPSProxy(
+            address(beHYPEImpl),
+            abi.encodeWithSelector(
+                BeHYPE.initialize.selector,
+                "BeHYPE Token",
+                "BHYPE",
+                address(roleRegistry)
+            )
+        )));
+
+        vm.startPrank(admin);
+        roleRegistry.grantRole(beHYPE.MINTER_ROLE(), minter);
+        roleRegistry.grantRole(beHYPE.BURNER_ROLE(), burner);
+        vm.stopPrank();
+    }
+
+    function _mintTokens(address to, uint256 amount) internal {
+        vm.prank(minter);
+        beHYPE.mint(to, amount);
+    }
+
+    function _burnTokens(address from, uint256 amount) internal {
+        vm.prank(burner);
+        beHYPE.burn(from, amount);
+    }
+
+    function _pauseBeHYPE() internal {
+        vm.prank(admin);
+        console.log("Pause functionality not implemented in current BeHYPE contract");
+    }
+
+    function _unpauseBeHYPE() internal {
+        vm.prank(admin);
+        console.log("Unpause functionality not implemented in current BeHYPE contract");
+    }
+}
