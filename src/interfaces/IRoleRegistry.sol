@@ -79,11 +79,17 @@ interface IRoleRegistry {
      */
     function PROTOCOL_PAUSER() external view returns (bytes32);
 
-    /** 
+        /**
      * @notice Returns the PROTOCOL_UNPAUSER role identifier
      * @return The bytes32 identifier for the PROTOCOL_UNPAUSER role
      */
     function PROTOCOL_UNPAUSER() external view returns (bytes32);
+
+    /**
+     * @notice Returns the PROTOCOL_UPDATER role identifier
+     * @return The bytes32 identifier for the PROTOCOL_UPDATER role
+     */
+    function PROTOCOL_UPDATER() external view returns (bytes32);
 
     /**
      * @notice Returns the current owner of the contract
