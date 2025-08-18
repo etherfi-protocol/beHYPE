@@ -7,11 +7,9 @@ import {IRoleRegistry} from "./interfaces/IRoleRegistry.sol";
 
 contract BeHYPE is ERC20PermitUpgradeable, UUPSUpgradeable {
     
+    address public stakingCore;
     IRoleRegistry public roleRegistry;
-
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
-
+    
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -20,21 +18,23 @@ contract BeHYPE is ERC20PermitUpgradeable, UUPSUpgradeable {
     function initialize(
         string calldata name,
         string calldata symbol,
-        address _roleRegistry) public initializer {
+        address _roleRegistry,
+        address _stakingCore) public initializer {
 
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
 
         roleRegistry = IRoleRegistry(_roleRegistry);
+        stakingCore = _stakingCore;
     }
 
     function mint(address to, uint256 amount) external {
-        if (!roleRegistry.hasRole(MINTER_ROLE, msg.sender)) revert("Incorrect role");
+        if (msg.sender != stakingCore) revert("Only StakingCore can mint");
         _mint(to, amount);
     }
 
     function burn(address from, uint256 amount) external {
-        if (!roleRegistry.hasRole(BURNER_ROLE, msg.sender)) revert("Incorrect role");
+        if (msg.sender != stakingCore) revert("Only StakingCore can burn");
         _burn(from, amount);
     }
 

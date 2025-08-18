@@ -18,19 +18,17 @@ contract BeHYPETest is BaseTest {
 
     function test_InitialState() public view {
         assertEq(beHYPE.name(), "BeHYPE Token");
-        assertEq(beHYPE.symbol(), "BHYPE");
+        assertEq(beHYPE.symbol(), "BeHYPE");
         assertEq(beHYPE.decimals(), 18);
         assertEq(beHYPE.totalSupply(), 0);
-
-        // Check roles
-        assertTrue(roleRegistry.hasRole(beHYPE.MINTER_ROLE(), minter));
-        assertTrue(roleRegistry.hasRole(beHYPE.BURNER_ROLE(), burner));
+        assertEq(beHYPE.stakingCore(), stakingCore);
+        assertEq(address(beHYPE.roleRegistry()), address(roleRegistry));
     }
 
     function test_Mint() public {
         uint256 amount = 100 ether;
 
-        vm.prank(minter);
+        vm.prank(stakingCore);
         vm.expectEmit(true, true, false, true);
         emit Transfer(address(0), user, amount);
         beHYPE.mint(user, amount);
@@ -98,7 +96,7 @@ contract BeHYPETest is BaseTest {
         uint256 amount = 100 ether;
 
         vm.prank(user);
-        vm.expectRevert("Incorrect role");
+        vm.expectRevert("Only StakingCore can mint");
         beHYPE.mint(user, amount);
     }
 
@@ -107,7 +105,7 @@ contract BeHYPETest is BaseTest {
         _mintTokens(user, 100 ether);
 
         vm.prank(user);
-        vm.expectRevert("Incorrect role");
+        vm.expectRevert("Only StakingCore can burn");
         beHYPE.burn(user, 50 ether);
     }
 

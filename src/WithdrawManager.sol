@@ -12,12 +12,6 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-/**
- * @title WithdrawalQueue
- * @notice Manages withdrawal requests with a time delay mechanism
- * @dev Implements upgradeable patterns with role-based access control via RoleRegistry
- * Integrates with beHYPE token and StakingCore for exchange rate calculations
- */
 contract WithdrawalQueue is
     Initializable,
     UUPSUpgradeable,
@@ -34,26 +28,19 @@ contract WithdrawalQueue is
 
     /* ========== STATE VARIABLES ========== */
     
-    // Core contracts
     IBeHYPEToken public beHypeToken;
     IStakingCore public stakingCore;
     IRoleRegistry public roleRegistry;
     
-    // Withdrawal parameters
-    uint256 public withdrawalDelay;
+    uint256 public totalQueuedWithdrawals;
+    uint256 public lastFinalizedIndex;
     
-    // Global accounting
-    uint256 public totalQueuedWithdrawals; // Total HYPE amount queued for withdrawal
-    uint256 public totalClaimed; // Total HYPE amount claimed
-    
-    // User tracking
-    mapping(address => uint256) public nextWithdrawalId;
-    
-    // Pause state
     bool public withdrawalsPaused;
     
-    // Private storage
-    mapping(address => mapping(uint256 => WithdrawalRequest)) private _withdrawalRequests;
+    WithdrawalEntry[] public withdrawalQueue;
+    
+    // Mapping from user address to array of withdrawal IDs
+    mapping(address => uint256[]) public userWithdrawals;
     
     /* ========== CONSTRUCTOR ========== */
     
@@ -64,18 +51,10 @@ contract WithdrawalQueue is
     
     /* ========== INITIALIZATION ========== */
     
-    /**
-     * @notice Initializes the WithdrawalQueue contract
-     * @param _roleRegistry Address of the role registry contract
-     * @param _beHypeToken Address of the beHYPE token contract
-     * @param _stakingCore Address of the staking core contract
-     * @param _withdrawalDelay Initial withdrawal delay in seconds
-     */
     function initialize(
         address _roleRegistry,
         address _beHypeToken,
-        address _stakingCore,
-        uint256 _withdrawalDelay
+        address _stakingCore
     ) public initializer {
         require(_roleRegistry != address(0), "Invalid role registry");
         require(_beHypeToken != address(0), "Invalid beHYPE token");
@@ -86,16 +65,10 @@ contract WithdrawalQueue is
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHypeToken);
         stakingCore = IStakingCore(_stakingCore);
-        withdrawalDelay = _withdrawalDelay;
     }
     
     /* ========== MAIN FUNCTIONS ========== */
     
-    /**
-     * @notice Queue a withdrawal request
-     * @param beHypeAmount Amount of beHYPE tokens to withdraw
-     * @return withdrawalId The ID of the withdrawal request
-     */
     function queueWithdrawal(
         uint256 beHypeAmount
     ) external nonReentrant returns (uint256 withdrawalId) {
@@ -103,250 +76,126 @@ contract WithdrawalQueue is
         require(beHypeAmount > 0, "Invalid amount");
         require(beHypeToken.balanceOf(msg.sender) >= beHypeAmount, "Insufficient beHYPE balance");
         
-        withdrawalId = nextWithdrawalId[msg.sender];
+        withdrawalId = withdrawalQueue.length;
         
-        // Calculate HYPE amount using current exchange ratio
         uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
         require(hypeAmount > 0, "Invalid HYPE amount");
         
-        // // Lock beHYPE tokens
-        // TODO: do we need safeTransfer?
-        // beHypeToken.safeTransferFrom(msg.sender, address(this), beHypeAmount);
         beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
-
-        // Create withdrawal request
-        _withdrawalRequests[msg.sender][withdrawalId] = WithdrawalRequest({
+        
+        withdrawalQueue.push(WithdrawalEntry({
+            user: msg.sender,
             beHypeAmount: beHypeAmount,
             hypeAmount: hypeAmount,
-            timestamp: block.timestamp
-        });
+            claimed: false
+        }));
         
-        nextWithdrawalId[msg.sender]++;
+        userWithdrawals[msg.sender].push(withdrawalId);
+        
         totalQueuedWithdrawals += hypeAmount;
         
-        emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount);
+        emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount, withdrawalId);
     }
     
-    /**
-     * @notice Confirm a single withdrawal request
-     * @param withdrawalId ID of the withdrawal to confirm
-     */
-    function confirmWithdrawal(uint256 withdrawalId) external nonReentrant {
-        uint256 amount = _processConfirmation(msg.sender, withdrawalId);
-        require(amount > 0, "No valid withdrawal request");
-        require(address(this).balance >= amount, "Insufficient contract balance");
+    function finalizeWithdrawals(uint256 index) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GOVERNOR(), msg.sender)) revert("Not authorized");
+        require(index < withdrawalQueue.length, "Index out of bounds");
+        require(index >= lastFinalizedIndex, "Can only finalize forward");
         
-        totalClaimed += amount;
+        lastFinalizedIndex = index;
         
-        // Process withdrawal
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "Transfer failed");
+        emit WithdrawalsBatchFinalized(index);
     }
     
-    /**
-     * @notice Confirm multiple withdrawal requests
-     * @param withdrawalIds Array of withdrawal IDs to confirm
-     */
-    function batchConfirmWithdrawals(uint256[] calldata withdrawalIds) external nonReentrant {
-        uint256 totalAmount = 0;
+    function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
+        require(withdrawalId < lastFinalizedIndex, "Withdrawal not finalized");
+        require(withdrawalId < withdrawalQueue.length, "Invalid withdrawal ID");
         
-        for (uint256 i = 0; i < withdrawalIds.length; i++) {
-            totalAmount += _processConfirmation(msg.sender, withdrawalIds[i]);
-        }
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        require(entry.user == msg.sender, "Not your withdrawal");
+        require(!entry.claimed, "Already claimed");
         
-        if (totalAmount > 0) {
-            require(address(this).balance >= totalAmount, "Insufficient contract balance");
-            
-            totalClaimed += totalAmount;
-            
-            // Process withdrawal
-            (bool success, ) = payable(msg.sender).call{value: totalAmount}("");
-            require(success, "Transfer failed");
-        }
-    }
-    
-    /* ========== INTERNAL FUNCTIONS ========== */
-    
-    /**
-     * @dev Process a single withdrawal confirmation
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal
-     * @return amount The amount processed, 0 if skipped
-     */
-    function _processConfirmation(address user, uint256 withdrawalId) internal returns (uint256) {
-        WithdrawalRequest memory request = _withdrawalRequests[user][withdrawalId];
+        uint256 hypeAmount = entry.hypeAmount;
+        uint256 beHypeAmount = entry.beHypeAmount;
         
-        // Skip if request doesn't exist or delay period not met
-        if (request.hypeAmount == 0 || block.timestamp < request.timestamp + withdrawalDelay) {
-            return 0;
-        }
+        entry.claimed = true;
         
-        uint256 hypeAmount = request.hypeAmount;
-        uint256 beHypeAmount = request.beHypeAmount;
+        totalQueuedWithdrawals -= entry.hypeAmount;
         
-        // Check beHYPE token balance
-        require(beHypeToken.balanceOf(address(this)) >= beHypeAmount, "Insufficient beHYPE balance");
-        
-        // Update state
-        totalQueuedWithdrawals -= hypeAmount;
-        delete _withdrawalRequests[user][withdrawalId];
-        
-        // Burn beHYPE tokens
         beHypeToken.burn(address(this), beHypeAmount);
         
-        emit WithdrawalConfirmed(user, withdrawalId, hypeAmount);
+    
+        (bool success, ) = payable(msg.sender).call{value: hypeAmount}("");
+        require(success, "Transfer failed");
         
-        return hypeAmount;
+        emit WithdrawalClaimed(msg.sender, withdrawalId, hypeAmount);
     }
     
     /* ========== VIEW FUNCTIONS ========== */
     
-    /**
-     * @notice Get withdrawal request details
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return Withdrawal request details
-     */
-    function getWithdrawalRequest(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (WithdrawalRequest memory) {
-        return _withdrawalRequests[user][withdrawalId];
+    function getWithdrawalQueueLength() external view returns (uint256) {
+        return withdrawalQueue.length;
     }
     
-    /**
-     * @notice Check if a withdrawal is ready to be confirmed
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return bool True if the withdrawal can be confirmed
-     */
-    function canConfirmWithdrawal(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (bool) {
-        WithdrawalRequest memory request = _withdrawalRequests[user][withdrawalId];
-        return request.hypeAmount > 0 && 
-               block.timestamp >= request.timestamp + withdrawalDelay &&
-               address(this).balance >= request.hypeAmount;
+    function getWithdrawalEntry(uint256 index) external view returns (WithdrawalEntry memory) {
+        require(index < withdrawalQueue.length, "Index out of bounds");
+        return withdrawalQueue[index];
     }
     
-    /**
-     * @notice Get the time remaining until a withdrawal can be confirmed
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return uint256 Time remaining in seconds, 0 if ready
-     */
-    function getWithdrawalTimeRemaining(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (uint256) {
-        WithdrawalRequest memory request = _withdrawalRequests[user][withdrawalId];
-        if (request.hypeAmount == 0) return 0;
+    function getPendingWithdrawalsCount() external view returns (uint256) {
+        return withdrawalQueue.length - lastFinalizedIndex;
+    }
+    
+    function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool) {
+        if (withdrawalId >= withdrawalQueue.length) return false;
+        if (withdrawalId >= lastFinalizedIndex) return false;
         
-        uint256 readyTime = request.timestamp + withdrawalDelay;
-        if (block.timestamp >= readyTime) return 0;
-        
-        return readyTime - block.timestamp;
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        return !entry.claimed && entry.hypeAmount > 0;
     }
     
-    /**
-     * @notice Get current exchange ratio from staking core
-     * @return uint256 Current exchange ratio
-     */
-    function getCurrentExchangeRatio() external view returns (uint256) {
-        return stakingCore.exchangeRatio();
-    }
-    
-    /**
-     * @notice Calculate HYPE amount for given beHYPE amount
-     * @param beHypeAmount Amount of beHYPE tokens
-     * @return uint256 Equivalent HYPE amount
-     */
-    function calculateHypeAmount(uint256 beHypeAmount) external view returns (uint256) {
-        return stakingCore.kHYPEToHYPE(beHypeAmount);
-    }
-    
-    /**
-     * @notice Calculate beHYPE amount for given HYPE amount
-     * @param hypeAmount Amount of HYPE tokens
-     * @return uint256 Equivalent beHYPE amount
-     */
-    function calculateBeHypeAmount(uint256 hypeAmount) external view returns (uint256) {
-        return stakingCore.HYPEToKHYPE(hypeAmount);
+    function getUserWithdrawals(address user) external view returns (uint256[] memory) {
+        return userWithdrawals[user];
     }
     
     /* ========== ADMIN FUNCTIONS ========== */
     
-    /**
-     * @notice Set withdrawal delay period
-     * @param newDelay New delay period in seconds
-     */
-    function setWithdrawalDelay(uint256 newDelay) external {
-        if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
-        withdrawalDelay = newDelay;
-        emit WithdrawalDelayUpdated(newDelay);
-    }
-    
-    /**
-     * @notice Pause withdrawals
-     */
     function pauseWithdrawals() external {
         if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
         withdrawalsPaused = true;
         emit WithdrawalsPaused(msg.sender);
     }
     
-    /**
-     * @notice Unpause withdrawals
-     */
     function unpauseWithdrawals() external {
         if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
         withdrawalsPaused = false;
         emit WithdrawalsUnpaused(msg.sender);
     }
     
-    /**
-     * @notice Cancel a withdrawal request (manager only)
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal to cancel
-     */
     function cancelWithdrawal(
         address user,
         uint256 withdrawalId
     ) external {
         if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
-        WithdrawalRequest storage request = _withdrawalRequests[user][withdrawalId];
-        require(request.hypeAmount > 0, "No such withdrawal request");
+        require(withdrawalId < withdrawalQueue.length, "Invalid withdrawal ID");
         
-        uint256 hypeAmount = request.hypeAmount;
-        uint256 beHypeAmount = request.beHypeAmount;
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        require(entry.user == user, "User mismatch");
+        require(!entry.claimed, "Already claimed or cancelled");
         
-        // Check beHYPE token balance
+        uint256 hypeAmount = entry.hypeAmount;
+        uint256 beHypeAmount = entry.beHypeAmount;
+        
         require(beHypeToken.balanceOf(address(this)) >= beHypeAmount, "Insufficient beHYPE balance");
         
-        // Clear the withdrawal request
-        delete _withdrawalRequests[user][withdrawalId];
+        // Mark as cancelled
+        entry.claimed = true;
+        
         totalQueuedWithdrawals -= hypeAmount;
         
-        // Return beHYPE tokens to user
-        // beHypeToken.safeTransfer(user, beHypeAmount);
         beHypeToken.transfer(user, beHypeAmount);
         
         emit WithdrawalCancelled(user, withdrawalId, beHypeAmount);
-    }
-    
-    /**
-     * @notice Update the staking core address
-     * @param newStakingCore New staking core address
-     */
-    function setStakingCore(address newStakingCore) external {
-        if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
-        require(newStakingCore != address(0), "Invalid staking core");
-        
-        address oldStakingCore = address(stakingCore);
-        stakingCore = IStakingCore(newStakingCore);
-        
-        emit StakingCoreUpdated(oldStakingCore, newStakingCore);
     }
 
     function _authorizeUpgrade(
@@ -355,8 +204,5 @@ contract WithdrawalQueue is
         roleRegistry.onlyProtocolUpgrader(msg.sender);
     }
     
-    /**
-     * @notice Receive function to accept ETH
-     */
     receive() external payable {}
 }

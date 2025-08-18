@@ -13,10 +13,11 @@ import {IStakingCore} from "./IStakingCore.sol";
 interface IWithdrawManager {
     /* ========== STRUCTS ========== */
     
-    struct WithdrawalRequest {
+    struct WithdrawalEntry {
+        address user;              // Address of the user
         uint256 beHypeAmount;      // Amount of beHYPE tokens locked
         uint256 hypeAmount;        // Amount of HYPE to be withdrawn
-        uint256 timestamp;         // Request timestamp
+        bool claimed;              // Whether the withdrawal has been claimed
     }
     
     /* ========== CONSTANTS ========== */
@@ -30,10 +31,9 @@ interface IWithdrawManager {
     // beHypeToken() external view returns (IBeHYPEToken);
     // stakingCore() external view returns (IStakingCore);
     // roleRegistry() external view returns (IRoleRegistry);
-    // withdrawalDelay() external view returns (uint256);
     // totalQueuedWithdrawals() external view returns (uint256);
     // totalClaimed() external view returns (uint256);
-    // nextWithdrawalId(address user) external view returns (uint256);
+    // lastFinalizedIndex() external view returns (uint256);
     // withdrawalsPaused() external view returns (bool);
     
     /* ========== MAIN FUNCTIONS ========== */
@@ -46,79 +46,46 @@ interface IWithdrawManager {
     function queueWithdrawal(uint256 beHypeAmount) external returns (uint256 withdrawalId);
     
     /**
-     * @notice Confirm a single withdrawal request
-     * @param withdrawalId ID of the withdrawal to confirm
+     * @notice Finalize withdrawals up to a specific index (protocol governor only)
+     * @param index Index up to which withdrawals should be finalized
      */
-    function confirmWithdrawal(uint256 withdrawalId) external;
+    function finalizeWithdrawals(uint256 index) external;
     
     /**
-     * @notice Confirm multiple withdrawal requests
-     * @param withdrawalIds Array of withdrawal IDs to confirm
+     * @notice Claim finalized withdrawal
+     * @param withdrawalId ID of the withdrawal to claim
      */
-    function batchConfirmWithdrawals(uint256[] calldata withdrawalIds) external;
+    function claimWithdrawal(uint256 withdrawalId) external;
     
     /* ========== VIEW FUNCTIONS ========== */
     
     /**
-     * @notice Get withdrawal request details
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return Withdrawal request details
+     * @notice Get the total length of the withdrawal queue
+     * @return uint256 Total number of withdrawals in the queue
      */
-    function getWithdrawalRequest(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (WithdrawalRequest memory);
+    function getWithdrawalQueueLength() external view returns (uint256);
     
     /**
-     * @notice Check if a withdrawal is ready to be confirmed
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return bool True if the withdrawal can be confirmed
+     * @notice Get a specific withdrawal entry from the queue
+     * @param index Index in the withdrawal queue
+     * @return WithdrawalEntry The withdrawal entry at the specified index
      */
-    function canConfirmWithdrawal(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (bool);
+    function getWithdrawalEntry(uint256 index) external view returns (WithdrawalEntry memory);
     
     /**
-     * @notice Get the time remaining until a withdrawal can be confirmed
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal request
-     * @return uint256 Time remaining in seconds, 0 if ready
+     * @notice Get the count of pending (unfinalized) withdrawals
+     * @return uint256 Number of pending withdrawals
      */
-    function getWithdrawalTimeRemaining(
-        address user,
-        uint256 withdrawalId
-    ) external view returns (uint256);
+    function getPendingWithdrawalsCount() external view returns (uint256);
     
     /**
-     * @notice Get current exchange ratio from staking core
-     * @return uint256 Current exchange ratio
+     * @notice Check if a withdrawal can be claimed
+     * @param withdrawalId ID of the withdrawal to check
+     * @return bool True if the withdrawal can be claimed
      */
-    function getCurrentExchangeRatio() external view returns (uint256);
-    
-    /**
-     * @notice Calculate HYPE amount for given beHYPE amount
-     * @param beHypeAmount Amount of beHYPE tokens
-     * @return uint256 Equivalent HYPE amount
-     */
-    function calculateHypeAmount(uint256 beHypeAmount) external view returns (uint256);
-    
-    /**
-     * @notice Calculate beHYPE amount for given HYPE amount
-     * @param hypeAmount Amount of HYPE tokens
-     * @return uint256 Equivalent beHYPE amount
-     */
-    function calculateBeHypeAmount(uint256 hypeAmount) external view returns (uint256);
+    function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool);
     
     /* ========== ADMIN FUNCTIONS ========== */
-    
-    /**
-     * @notice Set withdrawal delay period
-     * @param newDelay New delay period in seconds
-     */
-    function setWithdrawalDelay(uint256 newDelay) external;
     
     /**
      * @notice Pause withdrawals
@@ -137,22 +104,19 @@ interface IWithdrawManager {
      */
     function cancelWithdrawal(address user, uint256 withdrawalId) external;
     
-    /**
-     * @notice Update the staking core address
-     * @param newStakingCore New staking core address
-     */
-    function setStakingCore(address newStakingCore) external;
-    
     /* ========== EVENTS ========== */
     
     event WithdrawalQueued(
         address indexed user,
         uint256 indexed withdrawalId,
         uint256 beHypeAmount,
-        uint256 hypeAmount
+        uint256 hypeAmount,
+        uint256 queueIndex
     );
     
-    event WithdrawalConfirmed(
+    event WithdrawalsBatchFinalized(uint256 upToIndex);
+    
+    event WithdrawalClaimed(
         address indexed user,
         uint256 indexed withdrawalId,
         uint256 hypeAmount
@@ -164,8 +128,6 @@ interface IWithdrawManager {
         uint256 beHypeAmount
     );
     
-    event WithdrawalDelayUpdated(uint256 newDelay);
     event WithdrawalsPaused(address by);
     event WithdrawalsUnpaused(address by);
-    event StakingCoreUpdated(address oldStakingCore, address newStakingCore);
 }

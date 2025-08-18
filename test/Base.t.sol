@@ -10,11 +10,10 @@ import "forge-std/console.sol";
 
 contract BaseTest is Test {
     BeHYPE public beHYPE;
+    address public stakingCore;
     RoleRegistry public roleRegistry;
 
     address public admin = makeAddr("admin");
-    address public minter = makeAddr("minter");
-    address public burner = makeAddr("burner");
     address public user = makeAddr("user");
     address public user2 = makeAddr("user2");
 
@@ -24,37 +23,36 @@ contract BaseTest is Test {
     }
 
     function setUp() public virtual {
-        BeHYPE beHYPEImpl = new BeHYPE();
-        RoleRegistry roleRegistryImpl = new RoleRegistry();
+        stakingCore = makeAddr("stakingCore");
 
+        // Deploy RoleRegistry
+        RoleRegistry roleRegistryImpl = new RoleRegistry();
         roleRegistry = RoleRegistry(address(new UUPSProxy(
             address(roleRegistryImpl),
             abi.encodeWithSelector(RoleRegistry.initialize.selector, admin)
         )));
+
+        BeHYPE beHYPEImpl = new BeHYPE();   
 
         beHYPE = BeHYPE(address(new UUPSProxy(
             address(beHYPEImpl),
             abi.encodeWithSelector(
                 BeHYPE.initialize.selector,
                 "BeHYPE Token",
-                "BHYPE",
-                address(roleRegistry)
+                "BeHYPE",
+                address(roleRegistry),
+                stakingCore
             )
         )));
-
-        vm.startPrank(admin);
-        roleRegistry.grantRole(beHYPE.MINTER_ROLE(), minter);
-        roleRegistry.grantRole(beHYPE.BURNER_ROLE(), burner);
-        vm.stopPrank();
     }
 
     function _mintTokens(address to, uint256 amount) internal {
-        vm.prank(minter);
+        vm.prank(stakingCore);
         beHYPE.mint(to, amount);
     }
 
     function _burnTokens(address from, uint256 amount) internal {
-        vm.prank(burner);
+        vm.prank(stakingCore);
         beHYPE.burn(from, amount);
     }
 

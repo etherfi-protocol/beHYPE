@@ -20,15 +20,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
 
     uint256 public exchangeRatio = 1e18;
     
-    // APR limit threshold: 0.3% = 0.003 * 1e18 = 3e15
-    uint256 public constant MAX_APR_CHANGE = 3e15; // 0.3%
+    uint256 public constant MAX_APR_CHANGE = 3e15;
     
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read internal l1ReadContract = L1Read(0x0000000000000000000000000000000000000800);
     CoreWriter internal constant coreWriterContract = CoreWriter(0x3333333333333333333333333333333333333333);
 
     bytes32 public constant LIQUIDITY_MANAGER_ROLE = keccak256("LIQUIDITY_MANAGER_ROLE");
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -44,8 +42,14 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         beHypeToken = IBeHYPEToken(_beHype);
     }
 
+    function stake(string memory communityCode) public payable {
+       beHypeToken.mint(msg.sender, HYPEToKHYPE(msg.value));
+
+       emit Minted(msg.sender, HYPEToKHYPE(msg.value), communityCode); 
+    }
+
     function updateExchangeRatio() external {
-        require(roleRegistry.hasRole(roleRegistry.PROTOCOL_UPDATER(), msg.sender), "Not authorized");
+        require(roleRegistry.hasRole(roleRegistry.PROTOCOL_GOVERNOR(), msg.sender), "Not authorized");
         
         uint256 totalBeHypeSupply = beHypeToken.totalSupply();
 
@@ -77,23 +81,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
         require(amount > 0, "Amount must be greater than 0");
         
-        // Encode action 4: Staking deposit
-        bytes memory encodedAction = abi.encode(amount);
-        bytes memory data = new bytes(4 + encodedAction.length);
-        
-        // Version 1
-        data[0] = 0x01;
-        // Action ID 4 (big-endian)
-        data[1] = 0x00;
-        data[2] = 0x00;
-        data[3] = 0x04;
-        
-        // Copy action data
-        for (uint256 i = 0; i < encodedAction.length; i++) {
-            data[4 + i] = encodedAction[i];
-        }
-        
-        coreWriterContract.sendRawAction(data);
+        _encodeAction(4, abi.encode(amount));
         emit StakingDeposit(amount);
     }
 
@@ -101,48 +89,14 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
         require(amount > 0, "Amount must be greater than 0");
         
-        // Encode action 5: Staking withdraw
-        bytes memory encodedAction = abi.encode(amount);
-        bytes memory data = new bytes(4 + encodedAction.length);
-        
-        // Version 1
-        data[0] = 0x01;
-        // Action ID 5 (big-endian)
-        data[1] = 0x00;
-        data[2] = 0x00;
-        data[3] = 0x05;
-        
-        // Copy action data
-        for (uint256 i = 0; i < encodedAction.length; i++) {
-            data[4 + i] = encodedAction[i];
-        }
-        
-        coreWriterContract.sendRawAction(data);
+        _encodeAction(5, abi.encode(amount));
         emit StakingWithdraw(amount);
     }
 
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
-        require(validator != address(0), "Invalid validator address");
-        require(amount > 0, "Amount must be greater than 0");
         
-        // Encode action 3: Token delegate
-        bytes memory encodedAction = abi.encode(validator, amount, isUndelegate);
-        bytes memory data = new bytes(4 + encodedAction.length);
-        
-        // Version 1
-        data[0] = 0x01;
-        // Action ID 3 (big-endian)
-        data[1] = 0x00;
-        data[2] = 0x00;
-        data[3] = 0x03;
-        
-        // Copy action data
-        for (uint256 i = 0; i < encodedAction.length; i++) {
-            data[4 + i] = encodedAction[i];
-        }
-        
-        coreWriterContract.sendRawAction(data);
+        _encodeAction(3, abi.encode(validator, amount, isUndelegate));
         emit TokenDelegated(validator, amount, isUndelegate);
     }
 
@@ -154,15 +108,38 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         return Math.mulDiv(HYPEAmount, 1e18, exchangeRatio);
     }
 
-    function l1Read() external view returns (address) {
-        return address(l1ReadContract);
+     /**
+     * @notice Converts amount from 18 decimals to 8 decimals for L1 operations
+     * @param amount Amount in 18 decimals
+     * @return truncatedAmount Amount in 8 decimals
+     */
+    function _convertTo8Decimals(uint256 amount) internal pure returns (uint256 truncatedAmount) {
+        truncatedAmount = amount / 1e10;
+        require(truncatedAmount <= type(uint64).max, "Amount exceeds uint64 max");
+        return truncatedAmount;
     }
 
-    function coreWriter() external pure returns (address) {
-        return address(coreWriterContract);
+    /**
+     * @notice Encodes actions for hyperCore
+     * @dev https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/interacting-with-hypercore
+     * @param actionId The action ID (1-255)
+     * @param actionData The encoded action data
+     */
+    function _encodeAction(uint8 actionId, bytes memory actionData) internal {
+        bytes memory data = new bytes(4 + actionData.length);
+
+        data[0] = 0x01;
+        data[1] = 0x00;
+        data[2] = 0x00;
+        data[3] = bytes1(actionId);
+        
+        for (uint256 i = 0; i < actionData.length; i++) {
+            data[4 + i] = actionData[i];
+        }
+        coreWriterContract.sendRawAction(data);
     }
 
-     function _authorizeUpgrade(
+    function _authorizeUpgrade(
         address /* newImplementation */
     ) internal view override {
         roleRegistry.onlyProtocolUpgrader(msg.sender);

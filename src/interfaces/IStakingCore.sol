@@ -21,22 +21,33 @@ interface IStakingCore {
     event ExchangeRatioUpdated(uint256 oldRatio, uint256 newRatio);
 
     /**
-     * @notice Emitted when tokens are deposited to staking
+     * @notice Emitted when tokens are deposited to HyperCore staking module
      * @param amount The amount of tokens deposited
      */
-    event StakingDeposit(uint256 amount);
+    event HyperCoreDeposit(uint256 amount);
 
     /**
-     * @notice Emitted when tokens are withdrawn from staking
+     * @notice Emitted when tokens are withdrawn from HyperCore staking module
      * @param amount The amount of tokens withdrawn
      */
-    event StakingWithdraw(uint256 amount);
+    event HyperCoreWithdraw(uint256 amount);
+
+    /**
+     * @notice Emitted when tokens are staked
+     * @param user Who minted the tokens
+     * @param amount The amount of tokens staked
+     * @param communityCode The community code of the staked tokens
+     */
+    event Deposit(address user, uint256 amount, string communityCode);
+
+    /**
+    event Staked(uint256 oldSupply, uint256 newSupply);
 
     /**
      * @notice Emitted when tokens are delegated or undelegated
      * @param validator The validator address
      * @param amount The amount of tokens delegated/undelegated
-     * @param isUndelegate True if undelegating, false if delegating
+     * @param isUndelegate True if undelegating, false if delegating 22
      */
     event TokenDelegated(address validator, uint256 amount, bool isUndelegate);
 
@@ -79,18 +90,6 @@ interface IStakingCore {
     function L1_HYPE_CONTRACT() external view returns (address);
 
     /**
-     * @notice Returns the L1Read precompile contract address
-     * @return The address of the L1Read precompile contract
-     */
-    function l1Read() external view returns (address);
-
-    /**
-     * @notice Returns the CoreWriter contract address
-     * @return The address of the CoreWriter contract
-     */
-    function coreWriter() external pure returns (address);
-
-    /**
      * @notice Returns the LIQUIDITY_MANAGER_ROLE identifier
      * @return The bytes32 identifier for the LIQUIDITY_MANAGER_ROLE
      */
@@ -115,7 +114,7 @@ interface IStakingCore {
 
     /**
      * @notice Updates the exchange ratio based on L1 delegator summary
-     * @dev Only callable by accounts with PROTOCOL_UPDATER role
+     * @dev Only callable by accounts with PROTOCOL_GOVERNOR role
      * @dev Prevents negative rebases and enforces maximum APR change threshold
      * @dev Emits ExchangeRatioUpdated event on successful update
      */
