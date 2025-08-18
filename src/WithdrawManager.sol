@@ -21,11 +21,6 @@ contract WithdrawalQueue is
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    /* ========== CONSTANTS ========== */
-    
-    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-
     /* ========== STATE VARIABLES ========== */
     
     IBeHYPEToken public beHypeToken;
@@ -56,9 +51,6 @@ contract WithdrawalQueue is
         address _beHypeToken,
         address _stakingCore
     ) public initializer {
-        require(_roleRegistry != address(0), "Invalid role registry");
-        require(_beHypeToken != address(0), "Invalid beHYPE token");
-        require(_stakingCore != address(0), "Invalid staking core");
         
         __ReentrancyGuard_init();
         
@@ -170,32 +162,6 @@ contract WithdrawalQueue is
         if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
         withdrawalsPaused = false;
         emit WithdrawalsUnpaused(msg.sender);
-    }
-    
-    function cancelWithdrawal(
-        address user,
-        uint256 withdrawalId
-    ) external {
-        if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
-        require(withdrawalId < withdrawalQueue.length, "Invalid withdrawal ID");
-        
-        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
-        require(entry.user == user, "User mismatch");
-        require(!entry.claimed, "Already claimed or cancelled");
-        
-        uint256 hypeAmount = entry.hypeAmount;
-        uint256 beHypeAmount = entry.beHypeAmount;
-        
-        require(beHypeToken.balanceOf(address(this)) >= beHypeAmount, "Insufficient beHYPE balance");
-        
-        // Mark as cancelled
-        entry.claimed = true;
-        
-        totalQueuedWithdrawals -= hypeAmount;
-        
-        beHypeToken.transfer(user, beHypeAmount);
-        
-        emit WithdrawalCancelled(user, withdrawalId, beHypeAmount);
     }
 
     function _authorizeUpgrade(

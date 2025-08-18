@@ -14,20 +14,24 @@ import {CoreWriter} from "./lib/CoreWriter.sol";
 
 contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
 
-    IRoleRegistry public roleRegistry;
-    IBeHYPEToken public beHypeToken;
-    uint256 public totalHypeSupply;
+    /* ========== CONSTANTS ========== */
 
     uint256 public exchangeRatio = 1e18;
-    
+
     uint256 public constant MAX_APR_CHANGE = 3e15;
-    
+
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read internal l1ReadContract = L1Read(0x0000000000000000000000000000000000000800);
     CoreWriter internal constant coreWriterContract = CoreWriter(0x3333333333333333333333333333333333333333);
 
     bytes32 public constant LIQUIDITY_MANAGER_ROLE = keccak256("LIQUIDITY_MANAGER_ROLE");
 
+    /* ========== STATE VARIABLES ========== */
+
+    IRoleRegistry public roleRegistry;
+    IBeHYPEToken public beHypeToken;
+    uint256 public totalHypeSupply;
+   
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -42,11 +46,15 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         beHypeToken = IBeHYPEToken(_beHype);
     }
 
+    /* ========== MAIN FUNCTIONS ========== */
+
     function stake(string memory communityCode) public payable {
        beHypeToken.mint(msg.sender, HYPEToKHYPE(msg.value));
 
-       emit Minted(msg.sender, HYPEToKHYPE(msg.value), communityCode); 
+       emit Deposit(msg.sender, msg.value, communityCode); 
     }
+
+    /* ========== ADMIN FUNCTIONS ========== */
 
     function updateExchangeRatio() external {
         require(roleRegistry.hasRole(roleRegistry.PROTOCOL_GOVERNOR(), msg.sender), "Not authorized");
@@ -56,7 +64,6 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         try l1ReadContract.delegatorSummary(address(this)) returns (L1Read.DelegatorSummary memory delegatorSummary) {
             uint256 newRatio = Math.mulDiv(delegatorSummary.delegated, 1e18, totalBeHypeSupply);
             
-            // Prevent negative rebases - ratio can only increase or stay the same
             require(newRatio >= exchangeRatio, "Exchange ratio cannot decrease");
             
             uint256 ratioChange;
@@ -79,24 +86,22 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
 
     function depositToStaking(uint256 amount) external {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
-        require(amount > 0, "Amount must be greater than 0");
         
-        _encodeAction(4, abi.encode(amount));
-        emit StakingDeposit(amount);
+        _encodeAction(4, abi.encode(_convertTo8Decimals(amount)));
+        emit HyperCoreDeposit(amount);
     }
 
     function withdrawFromStaking(uint256 amount) external {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
-        require(amount > 0, "Amount must be greater than 0");
         
-        _encodeAction(5, abi.encode(amount));
-        emit StakingWithdraw(amount);
+        _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
+        emit HyperCoreWithdraw(amount);
     }
 
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external {
         require(roleRegistry.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "Not authorized");
         
-        _encodeAction(3, abi.encode(validator, amount, isUndelegate));
+        _encodeAction(3, abi.encode(validator, _convertTo8Decimals(amount), isUndelegate));
         emit TokenDelegated(validator, amount, isUndelegate);
     }
 
@@ -113,10 +118,10 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
      * @param amount Amount in 18 decimals
      * @return truncatedAmount Amount in 8 decimals
      */
-    function _convertTo8Decimals(uint256 amount) internal pure returns (uint256 truncatedAmount) {
-        truncatedAmount = amount / 1e10;
+    function _convertTo8Decimals(uint256 amount) internal pure returns (uint64) {
+        uint256 truncatedAmount = amount / 1e10;
         require(truncatedAmount <= type(uint64).max, "Amount exceeds uint64 max");
-        return truncatedAmount;
+        return uint64(truncatedAmount);
     }
 
     /**
