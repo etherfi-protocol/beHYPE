@@ -12,7 +12,7 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract WithdrawalQueue is
+contract WithdrawManager is
     Initializable,
     UUPSUpgradeable,
     IWithdrawManager,
@@ -33,26 +33,33 @@ contract WithdrawalQueue is
     bool public withdrawalsPaused;
     
     WithdrawalEntry[] public withdrawalQueue;
-    
-    // Mapping from user address to array of withdrawal IDs
     mapping(address => uint256[]) public userWithdrawals;
+
+    uint256 public minWithdrawalAmount;
+    uint256 public maxWithdrawalAmount;
     
-    /* ========== CONSTRUCTOR ========== */
+    /* ========== CONSTANTS ========== */
+    
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
     
-    /* ========== INITIALIZATION ========== */
-    
     function initialize(
+        uint256 _minStakeAmount,
+        uint256 _maxStakeAmount,
         address _roleRegistry,
         address _beHypeToken,
         address _stakingCore
     ) public initializer {
         
         __ReentrancyGuard_init();
+
+        minWithdrawalAmount = _minStakeAmount;
+        maxWithdrawalAmount = _maxStakeAmount;
         
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHypeToken);
@@ -64,14 +71,15 @@ contract WithdrawalQueue is
     function queueWithdrawal(
         uint256 beHypeAmount
     ) external nonReentrant returns (uint256 withdrawalId) {
-        require(!withdrawalsPaused, "Withdrawals are paused");
-        require(beHypeAmount > 0, "Invalid amount");
-        require(beHypeToken.balanceOf(msg.sender) >= beHypeAmount, "Insufficient beHYPE balance");
+        if (withdrawalsPaused) revert WithdrawalsPaused();
+        if (beHypeAmount < minWithdrawalAmount) revert InvalidAmount();
+        if (beHypeAmount > maxWithdrawalAmount) revert InvalidAmount();
+        if (beHypeToken.balanceOf(msg.sender) < beHypeAmount) revert InsufficientBeHYPEBalance();
         
         withdrawalId = withdrawalQueue.length;
         
         uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
-        require(hypeAmount > 0, "Invalid HYPE amount");
+        if (hypeAmount == 0) revert InvalidHYPEAmount();
         
         beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
         
@@ -90,9 +98,9 @@ contract WithdrawalQueue is
     }
     
     function finalizeWithdrawals(uint256 index) external {
-        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GOVERNOR(), msg.sender)) revert("Not authorized");
-        require(index < withdrawalQueue.length, "Index out of bounds");
-        require(index >= lastFinalizedIndex, "Can only finalize forward");
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        if (index >= withdrawalQueue.length) revert IndexOutOfBounds();
+        if (index < lastFinalizedIndex) revert CanOnlyFinalizeForward();
         
         lastFinalizedIndex = index;
         
@@ -100,12 +108,11 @@ contract WithdrawalQueue is
     }
     
     function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
-        require(withdrawalId < lastFinalizedIndex, "Withdrawal not finalized");
-        require(withdrawalId < withdrawalQueue.length, "Invalid withdrawal ID");
+        if (withdrawalId >= lastFinalizedIndex) revert WithdrawalNotFinalized();
+        if (withdrawalId >= withdrawalQueue.length) revert InvalidWithdrawalID();
         
         WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
-        require(entry.user == msg.sender, "Not your withdrawal");
-        require(!entry.claimed, "Already claimed");
+        if (entry.claimed) revert AlreadyClaimed();
         
         uint256 hypeAmount = entry.hypeAmount;
         uint256 beHypeAmount = entry.beHypeAmount;
@@ -116,23 +123,13 @@ contract WithdrawalQueue is
         
         beHypeToken.burn(address(this), beHypeAmount);
         
-    
-        (bool success, ) = payable(msg.sender).call{value: hypeAmount}("");
-        require(success, "Transfer failed");
+        (bool success, ) = payable(entry.user).call{value: hypeAmount}("");
+        if (!success) revert TransferFailed();
         
-        emit WithdrawalClaimed(msg.sender, withdrawalId, hypeAmount);
+        emit WithdrawalClaimed(entry.user, withdrawalId, hypeAmount);
     }
     
     /* ========== VIEW FUNCTIONS ========== */
-    
-    function getWithdrawalQueueLength() external view returns (uint256) {
-        return withdrawalQueue.length;
-    }
-    
-    function getWithdrawalEntry(uint256 index) external view returns (WithdrawalEntry memory) {
-        require(index < withdrawalQueue.length, "Index out of bounds");
-        return withdrawalQueue[index];
-    }
     
     function getPendingWithdrawalsCount() external view returns (uint256) {
         return withdrawalQueue.length - lastFinalizedIndex;
@@ -143,25 +140,33 @@ contract WithdrawalQueue is
         if (withdrawalId >= lastFinalizedIndex) return false;
         
         WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
-        return !entry.claimed && entry.hypeAmount > 0;
+        return !entry.claimed;
     }
     
-    function getUserWithdrawals(address user) external view returns (uint256[] memory) {
-        return userWithdrawals[user];
+    function getUserUnclaimedWithdrawals(address user) external view returns (uint256[] memory) {
+        uint256[] memory unclaimedWithdrawals = new uint256[](userWithdrawals[user].length);
+        
+        for (uint256 i = 0; i < userWithdrawals[user].length; i++) {
+            WithdrawalEntry storage entry = withdrawalQueue[userWithdrawals[user][i]];
+            if (!entry.claimed && entry.hypeAmount > 0) {
+                unclaimedWithdrawals[i] = userWithdrawals[user][i];
+            }
+        }
+        return unclaimedWithdrawals;
     }
     
     /* ========== ADMIN FUNCTIONS ========== */
     
     function pauseWithdrawals() external {
-        if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_PAUSER(), msg.sender)) revert NotAuthorized();
         withdrawalsPaused = true;
-        emit WithdrawalsPaused(msg.sender);
+        // emit WithdrawalsPaused();
     }
     
     function unpauseWithdrawals() external {
-        if (!roleRegistry.hasRole(MANAGER_ROLE, msg.sender)) revert("Not authorized");
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_UNPAUSER(), msg.sender)) revert NotAuthorized();
         withdrawalsPaused = false;
-        emit WithdrawalsUnpaused(msg.sender);
+        // emit WithdrawalsUnpaused();  
     }
 
     function _authorizeUpgrade(

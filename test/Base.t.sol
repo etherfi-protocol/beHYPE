@@ -6,6 +6,8 @@ import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.s
 import {UUPSProxy} from "../src/lib/UUPSProxy.sol";
 import {BeHYPE} from "../src/BeHYPE.sol";
 import {RoleRegistry} from "../src/RoleRegistry.sol";
+import {StakingCore} from "../src/StakingCore.sol";
+import {WithdrawManager} from "../src/WithdrawManager.sol";
 import "forge-std/console.sol";
 
 contract BaseTest is Test {
@@ -44,6 +46,21 @@ contract BaseTest is Test {
                 stakingCore
             )
         )));
+
+        // Deploy StakingCore
+        StakingCore stakingCoreImpl = new StakingCore();
+        stakingCore = StakingCore(address(new UUPSProxy(
+            address(stakingCoreImpl),
+            abi.encodeWithSelector(StakingCore.initialize.selector, address(roleRegistry), address(beHYPE))
+        )));
+
+        // Deploy WithdrawManager
+        WithdrawManager withdrawManagerImpl = new WithdrawManager();
+        withdrawManager = WithdrawManager(address(new UUPSProxy(
+            address(withdrawManagerImpl),
+            abi.encodeWithSelector(WithdrawManager.initialize.selector, address(roleRegistry), address(beHYPE))
+        )));
+
     }
 
     function _mintTokens(address to, uint256 amount) internal {

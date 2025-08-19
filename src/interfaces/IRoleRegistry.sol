@@ -79,17 +79,19 @@ interface IRoleRegistry {
      */
     function PROTOCOL_PAUSER() external view returns (bytes32);
 
-        /**
+    /**
      * @notice Returns the PROTOCOL_UNPAUSER role identifier
+     * @dev unpauses protocol actions
      * @return The bytes32 identifier for the PROTOCOL_UNPAUSER role
      */
     function PROTOCOL_UNPAUSER() external view returns (bytes32);
 
     /**
-     * @notice Returns the PROTOCOL_GOVERNOR role identifier
-     * @return The bytes32 identifier for the PROTOCOL_GOVERNOR role
+     * @notice Returns the PROTOCOL_ADMIN role identifier
+     * @dev performs protocol admin actions
+     * @return The bytes32 identifier for the PROTOCOL_ADMIN role
      */
-    function PROTOCOL_GOVERNOR() external view returns (bytes32);
+    function PROTOCOL_ADMIN() external view returns (bytes32);
 
     /**
      * @notice Returns the current owner of the contract

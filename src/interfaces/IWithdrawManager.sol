@@ -11,6 +11,7 @@ import {IStakingCore} from "./IStakingCore.sol";
  * @dev Defines all public and external functions for withdrawal management
  */
 interface IWithdrawManager {
+
     /* ========== STRUCTS ========== */
     
     struct WithdrawalEntry {
@@ -19,22 +20,44 @@ interface IWithdrawManager {
         uint256 hypeAmount;        // Amount of HYPE to be withdrawn
         bool claimed;              // Whether the withdrawal has been claimed
     }
+
+    /* ========== ERRORS ========== */
+
+    error WithdrawalsPaused();
+    error InvalidAmount();
+    error InsufficientBeHYPEBalance();
+    error InvalidHYPEAmount();
+    error NotAuthorized();
+    error IndexOutOfBounds();
+    error CanOnlyFinalizeForward();
+    error WithdrawalNotFinalized();
+    error InvalidWithdrawalID();
+    error AlreadyClaimed();
+    error TransferFailed();
+
+    /* ========== EVENTS ========== */
     
-    /* ========== CONSTANTS ========== */
+    event WithdrawalQueued(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 beHypeAmount,
+        uint256 hypeAmount,
+        uint256 queueIndex
+    );
     
-    function MANAGER_ROLE() external view returns (bytes32);
-    function OPERATOR_ROLE() external view returns (bytes32);
+    event WithdrawalsBatchFinalized(uint256 upToIndex);
     
-    /* ========== STATE VARIABLES ========== */
+    event WithdrawalClaimed(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 hypeAmount
+    );
     
-    // These are public state variables that automatically generate getter functions
-    // beHypeToken() external view returns (IBeHYPEToken);
-    // stakingCore() external view returns (IStakingCore);
-    // roleRegistry() external view returns (IRoleRegistry);
-    // totalQueuedWithdrawals() external view returns (uint256);
-    // totalClaimed() external view returns (uint256);
-    // lastFinalizedIndex() external view returns (uint256);
-    // withdrawalsPaused() external view returns (bool);
+    event WithdrawalCancelled(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 beHypeAmount
+    );
     
     /* ========== MAIN FUNCTIONS ========== */
     
@@ -58,19 +81,6 @@ interface IWithdrawManager {
     function claimWithdrawal(uint256 withdrawalId) external;
     
     /* ========== VIEW FUNCTIONS ========== */
-    
-    /**
-     * @notice Get the total length of the withdrawal queue
-     * @return uint256 Total number of withdrawals in the queue
-     */
-    function getWithdrawalQueueLength() external view returns (uint256);
-    
-    /**
-     * @notice Get a specific withdrawal entry from the queue
-     * @param index Index in the withdrawal queue
-     * @return WithdrawalEntry The withdrawal entry at the specified index
-     */
-    function getWithdrawalEntry(uint256 index) external view returns (WithdrawalEntry memory);
     
     /**
      * @notice Get the count of pending (unfinalized) withdrawals
@@ -97,37 +107,4 @@ interface IWithdrawManager {
      */
     function unpauseWithdrawals() external;
     
-    /**
-     * @notice Cancel a withdrawal request (manager only)
-     * @param user Address of the user
-     * @param withdrawalId ID of the withdrawal to cancel
-     */
-    function cancelWithdrawal(address user, uint256 withdrawalId) external;
-    
-    /* ========== EVENTS ========== */
-    
-    event WithdrawalQueued(
-        address indexed user,
-        uint256 indexed withdrawalId,
-        uint256 beHypeAmount,
-        uint256 hypeAmount,
-        uint256 queueIndex
-    );
-    
-    event WithdrawalsBatchFinalized(uint256 upToIndex);
-    
-    event WithdrawalClaimed(
-        address indexed user,
-        uint256 indexed withdrawalId,
-        uint256 hypeAmount
-    );
-    
-    event WithdrawalCancelled(
-        address indexed user,
-        uint256 indexed withdrawalId,
-        uint256 beHypeAmount
-    );
-    
-    event WithdrawalsPaused(address by);
-    event WithdrawalsUnpaused(address by);
 }

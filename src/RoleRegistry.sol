@@ -12,7 +12,7 @@ import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
 contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, EnumerableRoles {
     bytes32 public constant PROTOCOL_PAUSER = keccak256("PROTOCOL_PAUSER");
     bytes32 public constant PROTOCOL_UNPAUSER = keccak256("PROTOCOL_UNPAUSER");
-    bytes32 public constant PROTOCOL_GOVERNOR = keccak256("PROTOCOL_GOVERNOR");
+    bytes32 public constant PROTOCOL_ADMIN = keccak256("PROTOCOL_ADMIN");
 
     error OnlyProtocolUpgrader();
 
