@@ -14,6 +14,8 @@ contract BaseTest is Test {
     BeHYPE public beHYPE;
     address public stakingCore;
     RoleRegistry public roleRegistry;
+    address public withdrawManager;
+    address public hyperCore;
 
     address public admin = makeAddr("admin");
     address public user = makeAddr("user");
