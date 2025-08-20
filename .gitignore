@@ -9,7 +9,7 @@ out_forge/
 out-*/
 
 # Ignores development broadcast logs
-!/broadcast
+broadcast/
 
 # Dotenv file
 .env
