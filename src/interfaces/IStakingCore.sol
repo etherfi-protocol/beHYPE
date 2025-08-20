@@ -20,6 +20,7 @@ interface IStakingCore {
     error FailedToFetchDelegatorSummary();
     error AmountExceedsUint64Max();
     error FailedToDepositToHyperCore();
+    error StakingPaused();
 
     /* ========== EVENTS ========== */
 
@@ -70,7 +71,15 @@ interface IStakingCore {
      */
     event TokenDelegated(address validator, uint256 amount, bool isUndelegate);
 
-    /* ========== EXCHANGE RATIO MANAGEMENT ========== */
+    /* ========== MAIN FUNCTIONS ========== */
+
+    /**
+     * @notice Stakes HYPE
+     * @param communityCode The community code of the staked tokens
+     */
+    function stake(string memory communityCode) external payable;
+
+    /* ========== ADMIN FUNCTIONS ========== */
 
     /**
      * @notice Updates the exchange ratio based on L1 delegator summary
@@ -79,8 +88,6 @@ interface IStakingCore {
      * @dev Emits ExchangeRatioUpdated event on successful update
      */
     function updateExchangeRatio() external;
-
-    /* ========== STAKING OPERATIONS ========== */
 
     /**
      * @notice Deposits HYPE to staking via CoreWriter Action 4
@@ -111,7 +118,19 @@ interface IStakingCore {
      */
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external;
 
-    /* ========== CONVERSION FUNCTIONS ========== */
+    /**
+     * @notice Pauses staking
+     * @dev Only callable by accounts with PROTOCOL_PAUSER role
+     */
+    function pauseStaking() external;
+    
+    /**
+     * @notice Unpauses staking
+     * @dev Only callable by accounts with PROTOCOL_UNPAUSER role
+     */
+    function unpauseStaking() external;
+
+    /* ========== VIEW FUNCTIONS ========== */
 
     /**
      * @notice Converts kHYPE amount to HYPE using current exchange ratio

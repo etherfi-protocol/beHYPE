@@ -34,6 +34,7 @@ interface IWithdrawManager {
     error InvalidWithdrawalID();
     error AlreadyClaimed();
     error TransferFailed();
+    error WithdrawalsNotPaused();
 
     /* ========== EVENTS ========== */
     
@@ -54,6 +55,12 @@ interface IWithdrawManager {
     );
     
     event WithdrawalCancelled(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 beHypeAmount
+    );
+    
+    event WithdrawalInvalidated(
         address indexed user,
         uint256 indexed withdrawalId,
         uint256 beHypeAmount

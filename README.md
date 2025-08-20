@@ -33,15 +33,12 @@ Core staking contract
 
 ### RoleRegistry
 
-Manages all roles for the beHYPE protocol
+- Manages all roles for the beHYPE protocol
+- `PauseProtocol` function for emergency pause of staking and withdrawals
 
 ### BeHYPETimelock
 
 Timelock with 3 day delay controlling all upgrade roles for the protocol
-
-### BeHYPEAdmin
-
-pause/unpause all protocol contracts
 
 ## Cross Chain
 
@@ -56,4 +53,3 @@ pause/unpause all protocol contracts
 | StakingCore | TBD | TBD |
 | RoleRegistry | TBD | TBD |
 | BeHYPETimelock | TBD | TBD |
-| BeHYPEAdmin | TBD | TBD |

@@ -6,19 +6,19 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IRoleRegistry} from "./interfaces/IRoleRegistry.sol";
 import {IBeHYPEToken} from "./interfaces/IBeHYPE.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {L1Read} from "./lib/L1Read.sol";
 import {CoreWriter} from "./lib/CoreWriter.sol";
 
-contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
+contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUpgradeable {
 
      /* ========== STATE VARIABLES ========== */
 
     IRoleRegistry public roleRegistry;
     IBeHYPEToken public beHypeToken;
-    uint256 public totalHypeSupply;
 
     /* ========== CONSTANTS ========== */
 
@@ -26,9 +26,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
     uint256 public constant MAX_APR_CHANGE = 3e15; // TODO: make this configurable? compare to other protocols to see what they do
     uint64 public HYPE_TOKEN_ID = 150;
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
-    L1Read public l1Read = L1Read(0x0000000000000000000000000000000000000800);
+    L1Read public constant l1Read = L1Read(0xb7467E0524Afba7006957701d1F06A59000d15A2);
     CoreWriter public constant coreWriter = CoreWriter(0x3333333333333333333333333333333333333333);
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -37,7 +36,6 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
     
     function initialize(
         address _roleRegistry,
-        address /* _l1Read */,
         address _beHype) public initializer {
 
         roleRegistry = IRoleRegistry(_roleRegistry);
@@ -47,6 +45,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
     /* ========== MAIN FUNCTIONS ========== */
 
     function stake(string memory communityCode) public payable {
+       if (paused()) revert StakingPaused();
+        
        beHypeToken.mint(msg.sender, HYPEToKHYPE(msg.value));
 
        emit Deposit(msg.sender, msg.value, communityCode); 
@@ -56,30 +56,24 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
 
     function updateExchangeRatio() external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        
-        uint256 totalBeHypeSupply = beHypeToken.totalSupply();
 
-        try l1Read.delegatorSummary(address(this)) returns (L1Read.DelegatorSummary memory delegatorSummary) {
-            uint256 newRatio = Math.mulDiv(delegatorSummary.delegated, 1e18, totalBeHypeSupply);
-            
-            if (newRatio < exchangeRatio) revert ExchangeRatioCannotDecrease();
-            
-            uint256 ratioChange;
-            if (newRatio > exchangeRatio) {
-                ratioChange = newRatio - exchangeRatio;
-            } else {
-                ratioChange = exchangeRatio - newRatio;
-            }
-            
-            if (ratioChange > MAX_APR_CHANGE) revert ExchangeRatioChangeExceedsThreshold();
-            
-            uint256 oldRatio = exchangeRatio;
-            exchangeRatio = newRatio;
-            
-            emit ExchangeRatioUpdated(oldRatio, exchangeRatio);
-        } catch {
-            revert FailedToFetchDelegatorSummary();
+        uint256 newRatio = Math.mulDiv(getTotalProtocolHype(), 1e18, beHypeToken.totalSupply());
+        
+        if (newRatio < exchangeRatio) revert ExchangeRatioCannotDecrease();
+        
+        uint256 ratioChange;
+        if (newRatio > exchangeRatio) {
+            ratioChange = newRatio - exchangeRatio;
+        } else {
+            ratioChange = exchangeRatio - newRatio;
         }
+        
+        if (ratioChange > MAX_APR_CHANGE) revert ExchangeRatioChangeExceedsThreshold();
+        
+        uint256 oldRatio = exchangeRatio;
+        exchangeRatio = newRatio;
+        
+        emit ExchangeRatioUpdated(oldRatio, exchangeRatio);
     }
 
     function depositToHyperCore(uint256 amount) external {
@@ -118,6 +112,16 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         emit TokenDelegated(validator, amount, isUndelegate);
     }
 
+    function pauseStaking() external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_PAUSER(), msg.sender)) revert NotAuthorized();
+        _pause();
+    }
+
+    function unpauseStaking() external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_UNPAUSER(), msg.sender)) revert NotAuthorized();
+        _unpause();
+    }
+
     /* ========== VIEW FUNCTIONS ========== */
 
     function kHYPEToHYPE(uint256 kHYPEAmount) public view returns (uint256) {
@@ -128,12 +132,31 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable {
         return Math.mulDiv(HYPEAmount, 1e18, exchangeRatio);
     }
 
+    function getTotalProtocolHype() public view returns (uint256) {
+        L1Read.DelegatorSummary memory delegatorSummary = l1Read.delegatorSummary(address(this));
+        uint256 totalHypeInStakingAccount = _convertTo18Decimals(delegatorSummary.delegated) + _convertTo18Decimals(delegatorSummary.undelegated) + _convertTo18Decimals(delegatorSummary.totalPendingWithdrawal);
+
+        L1Read.SpotBalance memory spotBalance = l1Read.spotBalance(address(this), HYPE_TOKEN_ID);
+        uint256 totalHypeInSpotAccount = _convertTo18Decimals(spotBalance.total);
+
+        uint256 totalHypeInLiquidityPool = address(this).balance;
+
+        return totalHypeInStakingAccount + totalHypeInSpotAccount + totalHypeInLiquidityPool;
+    }
+
+    function 
+
     /* ========== INTERNAL FUNCTIONS ========== */
 
+    // TODO: create a unit test to go back and forth between 8 and 18 decimals
     function _convertTo8Decimals(uint256 amount) internal pure returns (uint64) {
         uint256 truncatedAmount = amount / 1e10;
         if (truncatedAmount > type(uint64).max) revert AmountExceedsUint64Max();
         return uint64(truncatedAmount);
+    }
+
+    function _convertTo18Decimals(uint64 amount) internal pure returns (uint256) {
+        return uint256(amount) * 1e10;
     }
 
     /**

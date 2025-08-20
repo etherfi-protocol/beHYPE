@@ -21,14 +21,14 @@ contract BeHYPETest is BaseTest {
         assertEq(beHYPE.symbol(), "BeHYPE");
         assertEq(beHYPE.decimals(), 18);
         assertEq(beHYPE.totalSupply(), 0);
-        assertEq(beHYPE.stakingCore(), stakingCore);
+        assertEq(beHYPE.stakingCore(), address(stakingCore));
         assertEq(address(beHYPE.roleRegistry()), address(roleRegistry));
     }
 
     function test_Mint() public {
         uint256 amount = 100 ether;
 
-        vm.prank(stakingCore);
+        vm.prank(address(stakingCore));
         vm.expectEmit(true, true, false, true);
         emit Transfer(address(0), user, amount);
         beHYPE.mint(user, amount);

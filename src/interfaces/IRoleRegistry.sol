@@ -94,6 +94,20 @@ interface IRoleRegistry {
     function PROTOCOL_ADMIN() external view returns (bytes32);
 
     /**
+     * @notice Returns the PROTOCOL_GUARDIAN role identifier
+     * @dev performs protocol guardian actions
+     * @return The bytes32 identifier for the PROTOCOL_GUARDIAN role
+     */
+    function PROTOCOL_GUARDIAN() external view returns (bytes32);
+
+    /**
+     * @notice Returns the PROTOCOL_TREASURY role identifier
+     * @dev performs protocol treasury actions
+     * @return The bytes32 identifier for the PROTOCOL_TREASURY role
+     */
+    function PROTOCOL_TREASURY() external view returns (bytes32);
+
+    /**
      * @notice Returns the current owner of the contract
      * @return The address of the current owner
      */

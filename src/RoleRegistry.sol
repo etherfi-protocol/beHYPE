@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
+import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
+import {IStakingCore} from "./interfaces/IStakingCore.sol";
 
 /// @title RoleRegistry - An upgradeable role-based access control system
 /// @notice Provides functionality for managing and querying roles with enumeration capabilities
@@ -13,8 +15,14 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     bytes32 public constant PROTOCOL_PAUSER = keccak256("PROTOCOL_PAUSER");
     bytes32 public constant PROTOCOL_UNPAUSER = keccak256("PROTOCOL_UNPAUSER");
     bytes32 public constant PROTOCOL_ADMIN = keccak256("PROTOCOL_ADMIN");
+    bytes32 public constant PROTOCOL_GUARDIAN = keccak256("PROTOCOL_GUARDIAN");
 
+    IWithdrawManager public withdrawManager;
+    IStakingCore public stakingCore;
+
+    // TODO- move to interface
     error OnlyProtocolUpgrader();
+    error NotAuthorized();
 
     /// @notice Returns the maximum allowed role value
     /// @dev This is used by EnumerableRoles._validateRole to ensure roles are within valid range
@@ -72,6 +80,23 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /// @return address[] Array of addresses that have the specified role
     function roleHolders(bytes32 role) public view returns (address[] memory) {
         return roleHolders(uint256(role));
+    }
+
+    /* ========== ADMIN FUNCTIONS ========== */
+
+    function pauseProtocol() public {
+        if (!hasRole(PROTOCOL_PAUSER, msg.sender)) revert NotAuthorized();
+
+        // TODO: Maybe a try catch. What if first call fails bc already paused and second is never called?
+        withdrawManager.pauseWithdrawals();
+        stakingCore.pauseStaking();
+    }
+
+    function unpauseProtocol() public {
+        if (!hasRole(PROTOCOL_UNPAUSER, msg.sender)) revert NotAuthorized();
+
+        withdrawManager.unpauseWithdrawals();
+        stakingCore.unpauseStaking();
     }
 
     function onlyProtocolUpgrader(address account) public view {

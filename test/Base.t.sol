@@ -8,14 +8,14 @@ import {BeHYPE} from "../src/BeHYPE.sol";
 import {RoleRegistry} from "../src/RoleRegistry.sol";
 import {StakingCore} from "../src/StakingCore.sol";
 import {WithdrawManager} from "../src/WithdrawManager.sol";
+import {StakingCore} from "../src/StakingCore.sol";
 import "forge-std/console.sol";
 
 contract BaseTest is Test {
     BeHYPE public beHYPE;
-    address public stakingCore;
     RoleRegistry public roleRegistry;
-    address public withdrawManager;
-    address public hyperCore;
+    WithdrawManager public withdrawManager;
+    StakingCore public stakingCore;
 
     address public admin = makeAddr("admin");
     address public user = makeAddr("user");
@@ -27,17 +27,25 @@ contract BaseTest is Test {
     }
 
     function setUp() public virtual {
-        stakingCore = makeAddr("stakingCore");
-
-        // Deploy RoleRegistry
         RoleRegistry roleRegistryImpl = new RoleRegistry();
         roleRegistry = RoleRegistry(address(new UUPSProxy(
             address(roleRegistryImpl),
             abi.encodeWithSelector(RoleRegistry.initialize.selector, admin)
         )));
 
-        BeHYPE beHYPEImpl = new BeHYPE();   
+        StakingCore stakingCoreImpl = new StakingCore();
+        stakingCore = StakingCore(payable(address(new UUPSProxy(
+            address(stakingCoreImpl),
+            abi.encodeWithSelector(StakingCore.initialize.selector, address(roleRegistry), address(beHYPE))
+        ))));
 
+        WithdrawManager withdrawManagerImpl = new WithdrawManager();
+        withdrawManager = WithdrawManager(payable(address(new UUPSProxy(
+            address(withdrawManagerImpl),
+            abi.encodeWithSelector(WithdrawManager.initialize.selector, address(roleRegistry), address(beHYPE))
+        ))));
+
+        BeHYPE beHYPEImpl = new BeHYPE();   
         beHYPE = BeHYPE(address(new UUPSProxy(
             address(beHYPEImpl),
             abi.encodeWithSelector(
@@ -45,33 +53,18 @@ contract BaseTest is Test {
                 "BeHYPE Token",
                 "BeHYPE",
                 address(roleRegistry),
-                stakingCore
+                address(stakingCore)
             )
         )));
-
-        // Deploy StakingCore
-        StakingCore stakingCoreImpl = new StakingCore();
-        stakingCore = StakingCore(address(new UUPSProxy(
-            address(stakingCoreImpl),
-            abi.encodeWithSelector(StakingCore.initialize.selector, address(roleRegistry), address(beHYPE))
-        )));
-
-        // Deploy WithdrawManager
-        WithdrawManager withdrawManagerImpl = new WithdrawManager();
-        withdrawManager = WithdrawManager(address(new UUPSProxy(
-            address(withdrawManagerImpl),
-            abi.encodeWithSelector(WithdrawManager.initialize.selector, address(roleRegistry), address(beHYPE))
-        )));
-
     }
 
     function _mintTokens(address to, uint256 amount) internal {
-        vm.prank(stakingCore);
+        vm.prank(address(stakingCore));
         beHYPE.mint(to, amount);
     }
 
     function _burnTokens(address from, uint256 amount) internal {
-        vm.prank(stakingCore);
+        vm.prank(address(stakingCore));
         beHYPE.burn(from, amount);
     }
 
