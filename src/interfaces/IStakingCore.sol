@@ -147,4 +147,10 @@ interface IStakingCore {
      * @dev Uses current exchange ratio for conversion
      */
     function HYPEToKHYPE(uint256 HYPEAmount) external view returns (uint256);
+
+    /**
+     * @notice Returns the total amount of HYPE in the protocol
+     * @return The total amount of HYPE in the protocol
+     */
+    function getTotalProtocolHype() external view returns (uint256);
 }

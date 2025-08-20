@@ -35,6 +35,8 @@ interface IWithdrawManager {
     error AlreadyClaimed();
     error TransferFailed();
     error WithdrawalsNotPaused();
+    error InsufficientHYPELiquidity();
+    error InvalidInstantWithdrawalFee();
 
     /* ========== EVENTS ========== */
     
@@ -66,14 +68,23 @@ interface IWithdrawManager {
         uint256 beHypeAmount
     );
     
+    event InstantWithdrawal(
+        address indexed user,
+        uint256 beHypeAmount,
+        uint256 hypeAmount
+    );
+    
+    event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
+    
     /* ========== MAIN FUNCTIONS ========== */
     
     /**
      * @notice Queue a withdrawal request
      * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @param instant Whether to withdraw instantly for a fee or queue
      * @return withdrawalId The ID of the withdrawal request
      */
-    function queueWithdrawal(uint256 beHypeAmount) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHypeAmount, bool instant) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
@@ -101,6 +112,13 @@ interface IWithdrawManager {
      * @return bool True if the withdrawal can be claimed
      */
     function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool);
+    
+    /**
+     * @notice Check if a withdrawal can be instant withdrawn
+     * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @return bool True if the withdrawal can be instant withdrawn
+     */
+    function canInstantWithdraw(uint256 beHypeAmount) external view returns (bool);
     
     /* ========== ADMIN FUNCTIONS ========== */
     

@@ -29,15 +29,16 @@ contract WithdrawManager is
     IStakingCore public stakingCore;
     IRoleRegistry public roleRegistry;
     
-    uint256 public totalQueuedWithdrawals;
+    uint256 public hypeLockedForWithdrawals;
     uint256 public lastFinalizedIndex;
-    
+
     WithdrawalEntry[] public withdrawalQueue;
     mapping(address => uint256[]) public userWithdrawals;
 
     uint256 public minWithdrawalAmount;
     uint256 public maxWithdrawalAmount;
 
+    uint256 public instantWithdrawalFeeInBps;
     uint256 public lowWatermarkInBpsOfTvl;
 
     /* ========== CONSTANTS ========== */
@@ -54,6 +55,7 @@ contract WithdrawManager is
         uint256 _minStakeAmount,
         uint256 _maxStakeAmount,
         uint256 _lowWatermarkInBpsOfTvl,
+        uint256 _instantWithdrawalFeeInBps,
         address _roleRegistry,
         address _beHypeToken,
         address _stakingCore
@@ -64,6 +66,7 @@ contract WithdrawManager is
         minWithdrawalAmount = _minStakeAmount;
         maxWithdrawalAmount = _maxStakeAmount;
         lowWatermarkInBpsOfTvl = _lowWatermarkInBpsOfTvl;
+        instantWithdrawalFeeInBps = _instantWithdrawalFeeInBps;
         
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHypeToken);
@@ -81,14 +84,30 @@ contract WithdrawManager is
         if (beHypeToken.balanceOf(msg.sender) < beHypeAmount) revert InsufficientBeHYPEBalance();
 
         if (instant) {
+            if (!canInstantWithdraw(beHypeAmount)) revert InsufficientHYPELiquidity();
 
+            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
+
+            uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
+            beHypeToken.transferFrom(address(this), roleRegistry.protocolTreasury(), instantWithdrawalFee);
+
+            uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
+            uint256 hypeWithdrawalAfterFee = stakingCore.kHYPEToHYPE(beHypeWithdrawalAfterFee);
+
+            beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
+
+            (bool success, ) = payable(msg.sender).call{value: hypeWithdrawalAfterFee}("");
+            if (!success) revert TransferFailed();
+
+            emit InstantWithdrawal(msg.sender, beHypeWithdrawalAfterFee, hypeWithdrawalAfterFee);
 
         } else {
-
             withdrawalId = withdrawalQueue.length;
         
             uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
             if (hypeAmount == 0) revert InvalidHYPEAmount();
+
+            hypeLockedForWithdrawals += hypeAmount;
         
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
         
@@ -100,9 +119,7 @@ contract WithdrawManager is
             }));
         
             userWithdrawals[msg.sender].push(withdrawalId);
-        
-            totalQueuedWithdrawals += hypeAmount;
-        
+                
             emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount, withdrawalId);
         }
         
@@ -130,9 +147,19 @@ contract WithdrawManager is
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (index >= withdrawalQueue.length) revert IndexOutOfBounds();
         if (index < lastFinalizedIndex) revert CanOnlyFinalizeForward();
-        
+
+        uint256 hypeAmountToFinalize = 0;
+        for (uint256 i = lastFinalizedIndex; i <= index;) {
+            hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
+
+            unchecked { ++i; }
+        }
+
+        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
+        if (liquidHypeAmount < hypeAmountToFinalize) revert InsufficientHYPELiquidity(); 
+
         lastFinalizedIndex = index;
-        
+
         emit WithdrawalsBatchFinalized(index);
     }
 
@@ -152,11 +179,19 @@ contract WithdrawManager is
         if (entry.claimed) revert AlreadyClaimed();
 
         entry.claimed = true;
-        totalQueuedWithdrawals -= entry.hypeAmount;
 
         beHypeToken.transfer(roleRegistry.protocolTreasury(), entry.beHypeAmount);
 
         emit WithdrawalInvalidated(entry.user, index, entry.beHypeAmount);
+    }
+
+    function setInstantWithdrawalFeeInBps(uint256 _instantWithdrawalFeeInBps) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        if (_instantWithdrawalFeeInBps > BASIS_POINT_SCALE) revert InvalidInstantWithdrawalFee();
+
+        instantWithdrawalFeeInBps = _instantWithdrawalFeeInBps;
+
+        emit InstantWithdrawalFeeInBpsUpdated(_instantWithdrawalFeeInBps);
     }
 
     function pauseWithdrawals() external {
@@ -190,6 +225,14 @@ contract WithdrawManager is
         }
         return unclaimedWithdrawals;
     }
+
+    function canInstantWithdraw(uint256 beHypeAmount) public view returns (bool) {
+        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
+
+        uint256 totalHype = stakingCore.getTotalProtocolHype();
+
+        return stakingCore.getTotalProtocolHype() >= lowWatermarkInHYPE();
+    } // TODO: add a function the bucket rate limiter check
     
     function getPendingWithdrawalsCount() external view returns (uint256) {
         return withdrawalQueue.length - lastFinalizedIndex;
@@ -214,9 +257,8 @@ contract WithdrawManager is
         uint256 beHypeAmount = entry.beHypeAmount;
         
         entry.claimed = true;
-        
-        totalQueuedWithdrawals -= entry.hypeAmount;
-        
+
+        hypeLockedForWithdrawals -= hypeAmount;
         beHypeToken.burn(address(this), beHypeAmount);
         
         (bool success, ) = payable(entry.user).call{value: hypeAmount}("");

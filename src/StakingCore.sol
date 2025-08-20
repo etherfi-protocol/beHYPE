@@ -144,8 +144,6 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         return totalHypeInStakingAccount + totalHypeInSpotAccount + totalHypeInLiquidityPool;
     }
 
-    function 
-
     /* ========== INTERNAL FUNCTIONS ========== */
 
     // TODO: create a unit test to go back and forth between 8 and 18 decimals
