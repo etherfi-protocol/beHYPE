@@ -145,7 +145,7 @@ contract WithdrawManager is
         }
     }
 
-    function adminWithdrawalInvalidation(uint256 index, address treasury) external {
+    function adminWithdrawalInvalidation(uint256 index) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
 
         WithdrawalEntry storage entry = withdrawalQueue[index];
@@ -154,7 +154,7 @@ contract WithdrawManager is
         entry.claimed = true;
         totalQueuedWithdrawals -= entry.hypeAmount;
 
-        beHypeToken.transfer(treasury, entry.beHypeAmount);
+        beHypeToken.transfer(roleRegistry.protocolTreasury(), entry.beHypeAmount);
 
         emit WithdrawalInvalidated(entry.user, index, entry.beHypeAmount);
     }

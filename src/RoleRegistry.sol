@@ -19,6 +19,7 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     IWithdrawManager public withdrawManager;
     IStakingCore public stakingCore;
+    address public protocolTreasury;
 
     // TODO- move to interface
     error OnlyProtocolUpgrader();
@@ -36,10 +37,12 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _disableInitializers();
     }
 
-    function initialize(address _owner) public initializer {
+    function initialize(address _owner, address _protocolTreasury) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         _transferOwnership(_owner);
+
+        protocolTreasury = _protocolTreasury;
     }
 
     /// @notice Checks if an account has any of the specified roles
@@ -83,6 +86,11 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /* ========== ADMIN FUNCTIONS ========== */
+
+    function setProtocolTreasury(address _protocolTreasury) public {
+        if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+        protocolTreasury = _protocolTreasury;
+    }
 
     function pauseProtocol() public {
         if (!hasRole(PROTOCOL_PAUSER, msg.sender)) revert NotAuthorized();
