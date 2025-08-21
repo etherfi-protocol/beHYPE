@@ -43,6 +43,13 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         _burn(from, amount);
     }
 
+    function setStakingCore(address _stakingCore) external {
+        roleRegistry.onlyProtocolUpgrader(msg.sender);
+        stakingCore = _stakingCore;
+
+        emit StakingCoreUpdated(stakingCore);
+    }
+
     function _authorizeUpgrade(
         address /* newImplementation */
     ) internal view override {

@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IBeHYPEToken is IERC20 {
 
     error Unauthorized();
+
+    event StakingCoreUpdated(address stakingCore);
     
     /**
      * @notice Mints new tokens to the specified address

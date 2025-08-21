@@ -6,12 +6,14 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRoleRegistry} from "./interfaces/IRoleRegistry.sol";
 import {IBeHYPEToken} from "./interfaces/IBeHype.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {BucketLimiter} from "./lib/BucketLimiter.sol";
 
 contract WithdrawManager is
     Initializable,
@@ -38,8 +40,11 @@ contract WithdrawManager is
     uint256 public minWithdrawalAmount;
     uint256 public maxWithdrawalAmount;
 
-    uint256 public instantWithdrawalFeeInBps;
-    uint256 public lowWatermarkInBpsOfTvl;
+    uint16 public instantWithdrawalFeeInBps;
+    uint16 public lowWatermarkInBpsOfTvl;
+
+    // Bucket rate limiter for instant withdrawals
+    BucketLimiter.Limit public instantWithdrawalLimit;
 
     /* ========== CONSTANTS ========== */
 
@@ -54,11 +59,13 @@ contract WithdrawManager is
     function initialize(
         uint256 _minStakeAmount,
         uint256 _maxStakeAmount,
-        uint256 _lowWatermarkInBpsOfTvl,
-        uint256 _instantWithdrawalFeeInBps,
+        uint16 _lowWatermarkInBpsOfTvl,
+        uint16 _instantWithdrawalFeeInBps,
         address _roleRegistry,
         address _beHypeToken,
-        address _stakingCore
+        address _stakingCore,
+        uint256 _bucketCapacity,
+        uint256 _bucketRefillRate
     ) public initializer {
         
         __ReentrancyGuard_init();
@@ -71,6 +78,11 @@ contract WithdrawManager is
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHypeToken);
         stakingCore = IStakingCore(_stakingCore);
+
+        instantWithdrawalLimit = BucketLimiter.create(
+            _convertToBucketUnit(_bucketCapacity, Math.Rounding.Floor), 
+            _convertToBucketUnit(_bucketRefillRate, Math.Rounding.Floor)
+        );
     }
     
     /* ========== MAIN FUNCTIONS ========== */
@@ -84,7 +96,11 @@ contract WithdrawManager is
         if (beHypeToken.balanceOf(msg.sender) < beHypeAmount) revert InsufficientBeHYPEBalance();
 
         if (instant) {
-            if (!canInstantWithdraw(beHypeAmount)) revert InsufficientHYPELiquidity();
+            uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
+            if (!canInstantWithdraw(hypeAmount)) revert InsufficientHYPELiquidity();
+
+            // Update rate limit - this will revert if rate limit exceeded
+            _updateRateLimit(hypeAmount);
 
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
 
@@ -133,14 +149,6 @@ contract WithdrawManager is
         _finalizeWithdrawal(withdrawalId);
     }
 
-    function instantWithdrawal(uint256 beHypeAmount) external nonReentrant {
-        if (paused()) revert WithdrawalsPaused();
-        if (beHypeAmount < minWithdrawalAmount) revert InvalidAmount();
-        if (beHypeAmount > maxWithdrawalAmount) revert InvalidAmount();
-        if (beHypeToken.balanceOf(msg.sender) < beHypeAmount) revert InsufficientBeHYPEBalance();
-        
-    }
-
     /* ========== ADMIN FUNCTIONS ========== */
 
     function finalizeWithdrawals(uint256 index) external {
@@ -166,7 +174,6 @@ contract WithdrawManager is
     function adminWithdrawalFinalization(uint256[] memory indexes) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
 
-
         for (uint256 i = 0; i < indexes.length; i++) {
             _finalizeWithdrawal(indexes[i]);
         }
@@ -185,13 +192,35 @@ contract WithdrawManager is
         emit WithdrawalInvalidated(entry.user, index, entry.beHypeAmount);
     }
 
-    function setInstantWithdrawalFeeInBps(uint256 _instantWithdrawalFeeInBps) external {
+    function setInstantWithdrawalFeeInBps(uint16 _instantWithdrawalFeeInBps) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
         if (_instantWithdrawalFeeInBps > BASIS_POINT_SCALE) revert InvalidInstantWithdrawalFee();
 
         instantWithdrawalFeeInBps = _instantWithdrawalFeeInBps;
 
         emit InstantWithdrawalFeeInBpsUpdated(_instantWithdrawalFeeInBps);
+    }
+
+    /**
+     * @dev Sets the maximum size of the bucket that can be consumed in a given time period.
+     * @param capacity The capacity of the bucket in HYPE.
+     */
+    function setInstantWithdrawalCapacity(uint256 capacity) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        // max capacity = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE, which is practically enough
+        uint64 bucketUnit = _convertToBucketUnit(capacity, Math.Rounding.Floor);
+        BucketLimiter.setCapacity(instantWithdrawalLimit, bucketUnit);
+    }
+
+    /**
+     * @dev Sets the rate at which the bucket is refilled per second.
+     * @param refillRate The rate at which the bucket is refilled per second in HYPE.
+     */
+    function setInstantWithdrawalRefillRatePerSecond(uint256 refillRate) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        // max refillRate = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE per second, which is practically enough
+        uint64 bucketUnit = _convertToBucketUnit(refillRate, Math.Rounding.Floor);
+        BucketLimiter.setRefillRate(instantWithdrawalLimit, bucketUnit);
     }
 
     function pauseWithdrawals() external {
@@ -226,13 +255,37 @@ contract WithdrawManager is
         return unclaimedWithdrawals;
     }
 
-    function canInstantWithdraw(uint256 beHypeAmount) public view returns (bool) {
+    /**
+     * @dev Returns whether the given amount can be instantly withdrawn.
+     * @param hypeAmount The HYPE amount to check.
+     */
+    function canInstantWithdraw(uint256 hypeAmount) public view returns (bool) {
         uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
 
-        uint256 totalHype = stakingCore.getTotalProtocolHype();
+        // Check low watermark
+        if (liquidHypeAmount < lowWatermarkInHYPE()) {
+            return false;
+        }
 
-        return stakingCore.getTotalProtocolHype() >= lowWatermarkInHYPE();
-    } // TODO: add a function the bucket rate limiter check
+        // Check rate limit
+        uint64 bucketUnit = _convertToBucketUnit(hypeAmount, Math.Rounding.Ceil);
+        bool consumable = BucketLimiter.canConsume(instantWithdrawalLimit, bucketUnit);
+        
+        return consumable && hypeAmount <= liquidHypeAmount;
+    }
+
+    /**
+     * @dev Returns the total amount that can be instantly withdrawn.
+     */
+    function totalInstantWithdrawableAmount() external view returns (uint256) {
+        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
+        if (liquidHypeAmount < lowWatermarkInHYPE()) {
+            return 0;
+        }
+        uint64 consumableBucketUnits = BucketLimiter.consumable(instantWithdrawalLimit);
+        uint256 consumableAmount = _convertFromBucketUnit(consumableBucketUnits);
+        return Math.min(consumableAmount, liquidHypeAmount);
+    }
     
     function getPendingWithdrawalsCount() external view returns (uint256) {
         return withdrawalQueue.length - lastFinalizedIndex;
@@ -265,6 +318,20 @@ contract WithdrawManager is
         if (!success) revert TransferFailed();
         
         emit WithdrawalClaimed(entry.user, index, hypeAmount);
+    }
+
+    function _updateRateLimit(uint256 amount) internal {
+        uint64 bucketUnit = _convertToBucketUnit(amount, Math.Rounding.Ceil);
+        require(BucketLimiter.consume(instantWithdrawalLimit, bucketUnit), "BucketRateLimiter: rate limit exceeded");
+    }
+
+    function _convertToBucketUnit(uint256 amount, Math.Rounding rounding) internal pure returns (uint64) {
+        require(amount < type(uint64).max * BUCKET_UNIT_SCALE, "WithdrawManager: Amount too large");
+        return (rounding == Math.Rounding.Ceil) ? SafeCast.toUint64((amount + BUCKET_UNIT_SCALE - 1) / BUCKET_UNIT_SCALE) : SafeCast.toUint64(amount / BUCKET_UNIT_SCALE);
+    }
+
+    function _convertFromBucketUnit(uint64 bucketUnit) internal pure returns (uint256) {
+        return bucketUnit * BUCKET_UNIT_SCALE;
     }
 
     function _authorizeUpgrade(

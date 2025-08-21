@@ -21,7 +21,8 @@ interface IStakingCore {
     error AmountExceedsUint64Max();
     error FailedToDepositToHyperCore();
     error StakingPaused();
-
+    error ElapsedTimeCannotBeZero();
+    
     /* ========== EVENTS ========== */
 
     /**

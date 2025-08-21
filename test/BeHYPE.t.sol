@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "./Base.t.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {IBeHYPEToken} from "../src/interfaces/IBeHype.sol";
 
 contract BeHYPETest is BaseTest {
     using ECDSA for bytes32;
@@ -71,7 +72,7 @@ contract BeHYPETest is BaseTest {
         address owner = vm.addr(privateKey);
         address spender = makeAddr("bob");
         uint256 value = 100 ether;
-        uint256 deadline = block.timestamp - 1; // Expired
+        uint256 deadline = block.timestamp - 1;
         uint256 nonce = beHYPE.nonces(owner);
 
         bytes32 structHash = keccak256(
@@ -96,7 +97,7 @@ contract BeHYPETest is BaseTest {
         uint256 amount = 100 ether;
 
         vm.prank(user);
-        vm.expectRevert("Only StakingCore can mint");
+        vm.expectRevert(abi.encodeWithSelector(IBeHYPEToken.Unauthorized.selector));
         beHYPE.mint(user, amount);
     }
 
@@ -105,7 +106,7 @@ contract BeHYPETest is BaseTest {
         _mintTokens(user, 100 ether);
 
         vm.prank(user);
-        vm.expectRevert("Only StakingCore can burn");
+        vm.expectRevert(abi.encodeWithSelector(IBeHYPEToken.Unauthorized.selector));
         beHYPE.burn(user, 50 ether);
     }
 

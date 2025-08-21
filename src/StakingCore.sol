@@ -12,6 +12,7 @@ import {IBeHYPEToken} from "./interfaces/IBeHYPE.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {L1Read} from "./lib/L1Read.sol";
 import {CoreWriter} from "./lib/CoreWriter.sol";
+import {console} from "forge-std/console.sol";
 
 contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUpgradeable {
 
@@ -22,8 +23,10 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     /* ========== CONSTANTS ========== */
 
-    uint256 public exchangeRatio = 1e18;
-    uint256 public constant MAX_APR_CHANGE = 3e15; // TODO: make this configurable? compare to other protocols to see what they do
+    uint256 public exchangeRatio;
+    uint32 public acceptablAprInBps;
+    bool public exchangeRateGuard;
+    uint256 public lastExchangeRatioUpdate;
     uint64 public HYPE_TOKEN_ID = 150;
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read public constant l1Read = L1Read(0xb7467E0524Afba7006957701d1F06A59000d15A2);
@@ -36,10 +39,18 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     
     function initialize(
         address _roleRegistry,
-        address _beHype) public initializer {
+        address _beHype,
+        uint32 _acceptablAprInBps,
+        bool _exchangeRateGuard
+    ) public initializer {
 
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHype);
+        acceptablAprInBps = _acceptablAprInBps;
+        exchangeRateGuard = _exchangeRateGuard;
+        
+        exchangeRatio = 1 ether;
+        lastExchangeRatioUpdate = block.timestamp;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
@@ -57,22 +68,38 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function updateExchangeRatio() external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
 
-        uint256 newRatio = Math.mulDiv(getTotalProtocolHype(), 1e18, beHypeToken.totalSupply());
+        uint256 totalProtocolHype = getTotalProtocolHype();
         
-        if (newRatio < exchangeRatio) revert ExchangeRatioCannotDecrease();
-        
+        uint256 newRatio = Math.mulDiv(totalProtocolHype, 1e18, beHypeToken.totalSupply());
+
         uint256 ratioChange;
         if (newRatio > exchangeRatio) {
             ratioChange = newRatio - exchangeRatio;
         } else {
             ratioChange = exchangeRatio - newRatio;
         }
+
+        uint256 elapsedTime = block.timestamp - lastExchangeRatioUpdate;
+        if (elapsedTime == 0) revert ElapsedTimeCannotBeZero();
+
+        uint256 percentageChange = Math.mulDiv(ratioChange, 1e18, exchangeRatio);
+        uint256 yearlyRate = Math.mulDiv(percentageChange, 365 days, elapsedTime);
+        uint256 yearlyRateInBps = yearlyRate / 1e14;
+
+        if (yearlyRateInBps > type(uint16).max) yearlyRateInBps = type(uint16).max;
+
+        console.log("yearlyRateInBps", yearlyRateInBps);
         
-        if (ratioChange > MAX_APR_CHANGE) revert ExchangeRatioChangeExceedsThreshold();
-        
+        uint16 yearlyRateInBps16 = uint16(yearlyRateInBps);
+
+        if (exchangeRateGuard) {
+            if (yearlyRateInBps16 > acceptablAprInBps) revert ExchangeRatioChangeExceedsThreshold();
+        }
+
         uint256 oldRatio = exchangeRatio;
         exchangeRatio = newRatio;
-        
+        lastExchangeRatioUpdate = block.timestamp;
+
         emit ExchangeRatioUpdated(oldRatio, exchangeRatio);
     }
 
@@ -134,19 +161,22 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function getTotalProtocolHype() public view returns (uint256) {
         L1Read.DelegatorSummary memory delegatorSummary = l1Read.delegatorSummary(address(this));
+        
         uint256 totalHypeInStakingAccount = _convertTo18Decimals(delegatorSummary.delegated) + _convertTo18Decimals(delegatorSummary.undelegated) + _convertTo18Decimals(delegatorSummary.totalPendingWithdrawal);
 
         L1Read.SpotBalance memory spotBalance = l1Read.spotBalance(address(this), HYPE_TOKEN_ID);
+        
         uint256 totalHypeInSpotAccount = _convertTo18Decimals(spotBalance.total);
 
         uint256 totalHypeInLiquidityPool = address(this).balance;
 
-        return totalHypeInStakingAccount + totalHypeInSpotAccount + totalHypeInLiquidityPool;
+        uint256 total = totalHypeInStakingAccount + totalHypeInSpotAccount + totalHypeInLiquidityPool;
+        
+        return total;
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
 
-    // TODO: create a unit test to go back and forth between 8 and 18 decimals
     function _convertTo8Decimals(uint256 amount) internal pure returns (uint64) {
         uint256 truncatedAmount = amount / 1e10;
         if (truncatedAmount > type(uint64).max) revert AmountExceedsUint64Max();
@@ -181,5 +211,9 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         address /* newImplementation */
     ) internal view override {
         roleRegistry.onlyProtocolUpgrader(msg.sender);
+    }
+
+    receive() external payable {
+        stake("");
     }
 }
