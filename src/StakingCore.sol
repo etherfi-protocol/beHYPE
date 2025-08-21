@@ -103,6 +103,16 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit ExchangeRatioUpdated(oldRatio, exchangeRatio);
     }
 
+    function updateAcceptableApr(uint16 _acceptablAprInBps) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        acceptablAprInBps = _acceptablAprInBps;
+    }
+
+    function updateExchangeRateGuard(bool _exchangeRateGuard) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        exchangeRateGuard = _exchangeRateGuard;
+    }
+
     function depositToHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
 
