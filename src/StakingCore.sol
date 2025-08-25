@@ -20,14 +20,14 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     IRoleRegistry public roleRegistry;
     IBeHYPEToken public beHypeToken;
-
+    address public withdrawManager;
     /* ========== CONSTANTS ========== */
 
     uint256 public exchangeRatio;
     uint32 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
-    uint64 public HYPE_TOKEN_ID = 150;
+    uint64 public constant HYPE_TOKEN_ID = 150;
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read public constant l1Read = L1Read(0xb7467E0524Afba7006957701d1F06A59000d15A2);
     CoreWriter public constant coreWriter = CoreWriter(0x3333333333333333333333333333333333333333);
@@ -40,6 +40,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function initialize(
         address _roleRegistry,
         address _beHype,
+        address _withdrawManager,
         uint32 _acceptablAprInBps,
         bool _exchangeRateGuard
     ) public initializer {
@@ -48,7 +49,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         beHypeToken = IBeHYPEToken(_beHype);
         acceptablAprInBps = _acceptablAprInBps;
         exchangeRateGuard = _exchangeRateGuard;
-        
+        withdrawManager = _withdrawManager;
+
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
     }
@@ -58,7 +60,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function stake(string memory communityCode) public payable {
        if (paused()) revert StakingPaused();
         
-       beHypeToken.mint(msg.sender, HYPEToKHYPE(msg.value));
+       beHypeToken.mint(msg.sender, HYPEToBeHYPE(msg.value));
 
        emit Deposit(msg.sender, msg.value, communityCode); 
     }
@@ -78,8 +80,9 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         } else {
             ratioChange = exchangeRatio - newRatio;
         }
-
+        
         uint256 elapsedTime = block.timestamp - lastExchangeRatioUpdate;
+
         if (elapsedTime == 0) revert ElapsedTimeCannotBeZero();
 
         uint256 percentageChange = Math.mulDiv(ratioChange, 1e18, exchangeRatio);
@@ -87,20 +90,32 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         uint256 yearlyRateInBps = yearlyRate / 1e14;
 
         if (yearlyRateInBps > type(uint16).max) yearlyRateInBps = type(uint16).max;
-
-        console.log("yearlyRateInBps", yearlyRateInBps);
         
         uint16 yearlyRateInBps16 = uint16(yearlyRateInBps);
 
         if (exchangeRateGuard) {
-            if (yearlyRateInBps16 > acceptablAprInBps) revert ExchangeRatioChangeExceedsThreshold();
+            if (yearlyRateInBps16 > acceptablAprInBps) revert ExchangeRatioChangeExceedsThreshold(yearlyRateInBps16);
         }
 
         uint256 oldRatio = exchangeRatio;
         exchangeRatio = newRatio;
         lastExchangeRatioUpdate = block.timestamp;
 
-        emit ExchangeRatioUpdated(oldRatio, exchangeRatio);
+        emit ExchangeRatioUpdated(oldRatio, exchangeRatio, yearlyRateInBps16);
+    }
+
+    function sendToWithdrawManager(uint256 amount) external {
+        if (msg.sender != withdrawManager) revert NotAuthorized();
+
+        (bool success,) = payable(withdrawManager).call{value: amount}("");
+        // if (!success) revert ;
+    }
+
+    function setWithdrawManager(address _withdrawManager) external {
+        roleRegistry.onlyProtocolUpgrader(msg.sender);
+        withdrawManager = _withdrawManager;
+
+        emit WithdrawManagerUpdated(withdrawManager);
     }
 
     function updateAcceptableApr(uint16 _acceptablAprInBps) external {
@@ -161,11 +176,11 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     /* ========== VIEW FUNCTIONS ========== */
 
-    function kHYPEToHYPE(uint256 kHYPEAmount) public view returns (uint256) {
+    function BeHYPEToHYPE(uint256 kHYPEAmount) public view returns (uint256) {
         return Math.mulDiv(kHYPEAmount, exchangeRatio, 1e18);
     }
 
-    function HYPEToKHYPE(uint256 HYPEAmount) public view returns (uint256) {
+    function HYPEToBeHYPE(uint256 HYPEAmount) public view returns (uint256) {
         return Math.mulDiv(HYPEAmount, 1e18, exchangeRatio);
     }
 

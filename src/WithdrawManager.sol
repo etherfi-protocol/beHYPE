@@ -31,7 +31,7 @@ contract WithdrawManager is
     IStakingCore public stakingCore;
     IRoleRegistry public roleRegistry;
     
-    uint256 public hypeLockedForWithdrawals;
+    uint256 public hypeRequestedForWithdraw;
     uint256 public lastFinalizedIndex;
 
     WithdrawalEntry[] public withdrawalQueue;
@@ -83,6 +83,13 @@ contract WithdrawManager is
             _convertToBucketUnit(_bucketCapacity, Math.Rounding.Floor), 
             _convertToBucketUnit(_bucketRefillRate, Math.Rounding.Floor)
         );
+
+        withdrawalQueue.push(WithdrawalEntry({
+            user: address(0),
+            beHypeAmount: 0,
+            hypeAmount: 0,
+            claimed: true
+        }));
     }
     
     /* ========== MAIN FUNCTIONS ========== */
@@ -96,7 +103,7 @@ contract WithdrawManager is
         if (beHypeToken.balanceOf(msg.sender) < beHypeAmount) revert InsufficientBeHYPEBalance();
 
         if (instant) {
-            uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
+            uint256 hypeAmount = stakingCore.BeHYPEToHYPE(beHypeAmount);
             if (!canInstantWithdraw(hypeAmount)) revert InsufficientHYPELiquidity();
 
             // Update rate limit - this will revert if rate limit exceeded
@@ -108,7 +115,7 @@ contract WithdrawManager is
             beHypeToken.transferFrom(address(this), roleRegistry.protocolTreasury(), instantWithdrawalFee);
 
             uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
-            uint256 hypeWithdrawalAfterFee = stakingCore.kHYPEToHYPE(beHypeWithdrawalAfterFee);
+            uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
 
             beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
 
@@ -120,10 +127,10 @@ contract WithdrawManager is
         } else {
             withdrawalId = withdrawalQueue.length;
         
-            uint256 hypeAmount = stakingCore.kHYPEToHYPE(beHypeAmount);
+            uint256 hypeAmount = stakingCore.BeHYPEToHYPE(beHypeAmount);
             if (hypeAmount == 0) revert InvalidHYPEAmount();
 
-            hypeLockedForWithdrawals += hypeAmount;
+            hypeRequestedForWithdraw += hypeAmount;
         
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
         
@@ -143,10 +150,9 @@ contract WithdrawManager is
     
     function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
         if (paused()) revert WithdrawalsPaused();
-        if (withdrawalId >= lastFinalizedIndex) revert WithdrawalNotFinalized();
-        if (withdrawalId >= withdrawalQueue.length) revert InvalidWithdrawalID();
+        if (!canClaimWithdrawal(withdrawalId)) revert WithdrawalNotFinalized();
         
-        _finalizeWithdrawal(withdrawalId);
+        _claimWithdrawal(withdrawalId);
     }
 
     /* ========== ADMIN FUNCTIONS ========== */
@@ -163,33 +169,15 @@ contract WithdrawManager is
             unchecked { ++i; }
         }
 
-        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
+        uint256 liquidHypeAmount = getLiquidHypeAmount();
         if (liquidHypeAmount < hypeAmountToFinalize) revert InsufficientHYPELiquidity(); 
 
+        hypeRequestedForWithdraw -= hypeAmountToFinalize;
         lastFinalizedIndex = index;
 
+        stakingCore.sendToWithdrawManager(hypeAmountToFinalize);
+
         emit WithdrawalsBatchFinalized(index);
-    }
-
-    function adminWithdrawalFinalization(uint256[] memory indexes) external {
-        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
-
-        for (uint256 i = 0; i < indexes.length; i++) {
-            _finalizeWithdrawal(indexes[i]);
-        }
-    }
-
-    function adminWithdrawalInvalidation(uint256 index) external {
-        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
-
-        WithdrawalEntry storage entry = withdrawalQueue[index];
-        if (entry.claimed) revert AlreadyClaimed();
-
-        entry.claimed = true;
-
-        beHypeToken.transfer(roleRegistry.protocolTreasury(), entry.beHypeAmount);
-
-        emit WithdrawalInvalidated(entry.user, index, entry.beHypeAmount);
     }
 
     function setInstantWithdrawalFeeInBps(uint16 _instantWithdrawalFeeInBps) external {
@@ -235,9 +223,9 @@ contract WithdrawManager is
     
     /* ========== VIEW FUNCTIONS ========== */
 
-    function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool) {
+    function canClaimWithdrawal(uint256 withdrawalId) public view returns (bool) {
         if (withdrawalId >= withdrawalQueue.length) return false;
-        if (withdrawalId >= lastFinalizedIndex) return false;
+        if (withdrawalId > lastFinalizedIndex) return false;
         
         WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
         return !entry.claimed;
@@ -260,31 +248,31 @@ contract WithdrawManager is
      * @param hypeAmount The HYPE amount to check.
      */
     function canInstantWithdraw(uint256 hypeAmount) public view returns (bool) {
-        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
+        if (getLiquidHypeAmount() < lowWatermarkInHYPE()) return false;
 
-        // Check low watermark
-        if (liquidHypeAmount < lowWatermarkInHYPE()) {
-            return false;
-        }
-
-        // Check rate limit
         uint64 bucketUnit = _convertToBucketUnit(hypeAmount, Math.Rounding.Ceil);
         bool consumable = BucketLimiter.canConsume(instantWithdrawalLimit, bucketUnit);
         
-        return consumable && hypeAmount <= liquidHypeAmount;
+        return consumable && hypeAmount <= getLiquidHypeAmount();
     }
 
     /**
      * @dev Returns the total amount that can be instantly withdrawn.
      */
     function totalInstantWithdrawableAmount() external view returns (uint256) {
-        uint256 liquidHypeAmount = address(stakingCore).balance - hypeLockedForWithdrawals;
-        if (liquidHypeAmount < lowWatermarkInHYPE()) {
-            return 0;
-        }
+        if (getLiquidHypeAmount() < lowWatermarkInHYPE()) return 0;
+        
         uint64 consumableBucketUnits = BucketLimiter.consumable(instantWithdrawalLimit);
         uint256 consumableAmount = _convertFromBucketUnit(consumableBucketUnits);
-        return Math.min(consumableAmount, liquidHypeAmount);
+        return Math.min(consumableAmount, getLiquidHypeAmount());
+    }
+
+    /**
+     * @dev Returns the current liquid HYPE amount available for withdrawals.
+     * This is the difference between the staking core's balance and this contract's balance.
+     */
+    function getLiquidHypeAmount() public view returns (uint256) {
+        return address(stakingCore).balance - address(this).balance;
     }
     
     function getPendingWithdrawalsCount() external view returns (uint256) {
@@ -300,7 +288,7 @@ contract WithdrawManager is
     
     /* ========== INTERNAL FUNCTIONS ========== */
 
-    function _finalizeWithdrawal(uint256 index) internal {
+    function _claimWithdrawal(uint256 index) internal {
         if (index >= withdrawalQueue.length) revert InvalidWithdrawalID();
 
         WithdrawalEntry storage entry = withdrawalQueue[index];
@@ -311,7 +299,6 @@ contract WithdrawManager is
         
         entry.claimed = true;
 
-        hypeLockedForWithdrawals -= hypeAmount;
         beHypeToken.burn(address(this), beHypeAmount);
         
         (bool success, ) = payable(entry.user).call{value: hypeAmount}("");

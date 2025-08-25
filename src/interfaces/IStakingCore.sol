@@ -15,8 +15,7 @@ interface IStakingCore {
     /* ========== ERRORS ========== */
 
     error NotAuthorized();
-    error ExchangeRatioCannotDecrease();
-    error ExchangeRatioChangeExceedsThreshold();
+    error ExchangeRatioChangeExceedsThreshold(uint16 yearlyRateInBps);
     error FailedToFetchDelegatorSummary();
     error AmountExceedsUint64Max();
     error FailedToDepositToHyperCore();
@@ -29,8 +28,9 @@ interface IStakingCore {
      * @notice Emitted when the exchange ratio is updated
      * @param oldRatio The previous exchange ratio
      * @param newRatio The new exchange ratio
+     * @param yearlyRateInBps The yearly rate in bps
      */
-    event ExchangeRatioUpdated(uint256 oldRatio, uint256 newRatio);
+    event ExchangeRatioUpdated(uint256 oldRatio, uint256 newRatio, uint16 yearlyRateInBps);
 
     /**
      * @notice Emitted when HYPE is deposited to HyperCore staking module from HyperCore spot account
@@ -71,6 +71,12 @@ interface IStakingCore {
      * @param isUndelegate True if undelegating, false if delegating 22
      */
     event TokenDelegated(address validator, uint256 amount, bool isUndelegate);
+
+    /**
+     * @notice Emitted when the withdraw manager is updated
+     * @param withdrawManager The new withdraw manager
+     */
+    event WithdrawManagerUpdated(address withdrawManager);
 
     /* ========== MAIN FUNCTIONS ========== */
 
@@ -120,6 +126,13 @@ interface IStakingCore {
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external;
 
     /**
+     * @notice Sends HYPE to the withdraw manager
+     * @param amount The amount of HYPE to send
+     * @dev Only callable by the withdraw manager
+     */
+    function sendToWithdrawManager(uint256 amount) external;
+
+    /**
      * @notice Pauses staking
      * @dev Only callable by accounts with PROTOCOL_PAUSER role
      */
@@ -139,7 +152,7 @@ interface IStakingCore {
      * @return The equivalent amount of HYPE tokens
      * @dev Uses current exchange ratio for conversion
      */
-    function kHYPEToHYPE(uint256 kHYPEAmount) external view returns (uint256);
+    function BeHYPEToHYPE(uint256 kHYPEAmount) external view returns (uint256);
 
     /**
      * @notice Converts HYPE amount to kHYPE using current exchange ratio
@@ -147,7 +160,7 @@ interface IStakingCore {
      * @return The equivalent amount of kHYPE tokens
      * @dev Uses current exchange ratio for conversion
      */
-    function HYPEToKHYPE(uint256 HYPEAmount) external view returns (uint256);
+    function HYPEToBeHYPE(uint256 HYPEAmount) external view returns (uint256);
 
     /**
      * @notice Returns the total amount of HYPE in the protocol

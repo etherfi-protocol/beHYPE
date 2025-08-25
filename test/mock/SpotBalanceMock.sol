@@ -10,19 +10,15 @@ contract SpotBalanceMock {
 
     mapping(address => mapping(uint64 => SpotBalance)) public spotBalances;
 
-    constructor() {
-        spotBalances[0x1234567890123456789012345678901234567890][0] = SpotBalance({
-            total: 100_000_000,
-            hold: 50_000_000,
-            entryNtl: 10_000_000
-        });
-    }
+    constructor() {}
 
-    function setSpotBalance(address user, uint64 token, uint64 total, uint64 hold, uint64 entryNtl) external {
-        spotBalances[user][token] = SpotBalance({
-            total: total,
-            hold: hold,
-            entryNtl: entryNtl
+    function setSpotHypeBalance(address user, uint256 total) external {
+        total = total / 1e10;
+
+        spotBalances[user][150] = SpotBalance({
+            total: uint64(total),
+            hold: 0,
+            entryNtl: 0
         });
     }
 

@@ -12,6 +12,7 @@ interface IBeHYPEToken is IERC20 {
     error Unauthorized();
 
     event StakingCoreUpdated(address stakingCore);
+    event WithdrawManagerUpdated(address withdrawManager);
     
     /**
      * @notice Mints new tokens to the specified address

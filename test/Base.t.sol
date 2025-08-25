@@ -9,6 +9,8 @@ import {RoleRegistry} from "../src/RoleRegistry.sol";
 import {StakingCore} from "../src/StakingCore.sol";
 import {WithdrawManager} from "../src/WithdrawManager.sol";
 import {StakingCore} from "../src/StakingCore.sol";
+import {IStakingCore} from "../src/interfaces/IStakingCore.sol";
+import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
 import {SpotBalanceMock} from "./mock/SpotBalanceMock.sol";
 import {DelegatorSummaryMock} from "./mock/DelegatorSummaryMock.sol";
@@ -27,6 +29,8 @@ contract BaseTest is Test {
 
     address constant SPOT_BALANCE_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000801;
     address constant DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000805;
+    // TODO: add this to an address registry bc its one of our deployed address and not a precompile
+    address constant L1_READ_PRECOMPILE_ADDRESS = 0xb7467E0524Afba7006957701d1F06A59000d15A2;
 
     function _getProxyImplementation(address proxy) internal view returns (address) {
         bytes32 implSlot = vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT);
@@ -40,8 +44,7 @@ contract BaseTest is Test {
         
         vm.etch(SPOT_BALANCE_PRECOMPILE_ADDRESS, address(spotBalanceMock).code);
         vm.etch(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, address(delegatorSummaryMock).code);
-        // TODO: add this to an address registry
-        vm.etch(0xb7467E0524Afba7006957701d1F06A59000d15A2, address(l1Read).code);
+        vm.etch(L1_READ_PRECOMPILE_ADDRESS, address(l1Read).code);
         
         RoleRegistry roleRegistryImpl = new RoleRegistry();
         roleRegistry = RoleRegistry(address(new UUPSProxy(
@@ -68,6 +71,7 @@ contract BaseTest is Test {
                 StakingCore.initialize.selector,
                 address(roleRegistry),
                 address(beHYPE),
+                address(withdrawManager),
                 400,
                 true
             )
@@ -91,6 +95,8 @@ contract BaseTest is Test {
 
         vm.startPrank(admin);
         beHYPE.setStakingCore(address(stakingCore));
+        beHYPE.setWithdrawManager(address(withdrawManager));
+        stakingCore.setWithdrawManager(address(withdrawManager));
         roleRegistry.grantRole(roleRegistry.PROTOCOL_ADMIN(), admin);
         roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), admin);
         roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), admin);
@@ -98,6 +104,7 @@ contract BaseTest is Test {
         vm.stopPrank();
 
         vm.deal(user, 10 ether);
+        vm.deal(user2, 10 ether);
     }
 
     function _mintTokens(address to, uint256 amount) internal {
@@ -106,58 +113,31 @@ contract BaseTest is Test {
     }
 
     function _burnTokens(address from, uint256 amount) internal {
-        vm.prank(address(stakingCore));
+        vm.prank(address(withdrawManager));
         beHYPE.burn(from, amount);
     }
 
-    function _pauseBeHYPE() internal {
+    function _convertTo8Decimals(uint256 amount) internal pure returns (uint64) {
+        uint256 truncatedAmount = amount / 1e10;
+        if (truncatedAmount > type(uint64).max) revert("Amount exceeds uint64 max");
+        return uint64(truncatedAmount);
+    }
+
+    function _convertTo18Decimals(uint64 amount) internal pure returns (uint256) {
+        return uint256(amount) * 1e10;
+    }
+
+
+    function mockDepositToHyperCore(uint256 amount) public {
+        
+        L1Read.SpotBalance memory spotBalanceBefore = L1Read(L1_READ_PRECOMPILE_ADDRESS).spotBalance(address(stakingCore), 150);
+
         vm.prank(admin);
-        console.log("Pause functionality not implemented in current BeHYPE contract");
-    }
+        stakingCore.depositToHyperCore(amount);
 
-    function _unpauseBeHYPE() internal {
-        vm.prank(admin);
-        console.log("Unpause functionality not implemented in current BeHYPE contract");
-    }
+        uint256 newTotalInSpotAccount = spotBalanceBefore.total + _convertTo8Decimals(amount);
 
-    function _setSpotBalance(address user, uint64 token, uint256 total, uint256 hold, uint256 entryNtl) internal {
-        // total = total / 1e10;
-        // hold = hold / 1e10;
-        // entryNtl = entryNtl / 1e10;
+        SpotBalanceMock(SPOT_BALANCE_PRECOMPILE_ADDRESS).setSpotHypeBalance(address(stakingCore), newTotalInSpotAccount);
 
-        bytes32 userTokenKey = keccak256(abi.encode(user, token));
-        bytes32 balanceSlot = keccak256(abi.encode(userTokenKey, uint256(0)));
-        vm.store(SPOT_BALANCE_PRECOMPILE_ADDRESS, balanceSlot, bytes32(uint256(total)));
-        
-        balanceSlot = keccak256(abi.encode(userTokenKey, uint256(1)));
-        vm.store(SPOT_BALANCE_PRECOMPILE_ADDRESS, balanceSlot, bytes32(uint256(hold)));
-        
-        balanceSlot = keccak256(abi.encode(userTokenKey, uint256(2)));
-        vm.store(SPOT_BALANCE_PRECOMPILE_ADDRESS, balanceSlot, bytes32(uint256(entryNtl)));
-    }
-
-    function _setDelegatorSummary(
-        address user, 
-        uint256 delegated, 
-        uint256 undelegated, 
-        uint256 totalPendingWithdrawal, 
-        uint256 nPendingWithdrawals
-    ) internal {
-        // delegated = delegated / 1e10;
-        // undelegated = undelegated / 1e10;
-        // totalPendingWithdrawal = totalPendingWithdrawal / 1e10;
-
-        bytes32 userKey = keccak256(abi.encode(user));
-        bytes32 summarySlot = keccak256(abi.encode(userKey, uint256(0))); 
-        vm.store(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, summarySlot, bytes32(uint256(delegated)));
-        
-        summarySlot = keccak256(abi.encode(userKey, uint256(1)));
-        vm.store(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, summarySlot, bytes32(uint256(undelegated)));
-        
-        summarySlot = keccak256(abi.encode(userKey, uint256(2)));
-        vm.store(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, summarySlot, bytes32(uint256(totalPendingWithdrawal)));
-        
-        summarySlot = keccak256(abi.encode(userKey, uint256(3)));
-        vm.store(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, summarySlot, bytes32(uint256(nPendingWithdrawals)));
     }
 }

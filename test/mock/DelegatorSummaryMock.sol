@@ -17,18 +17,16 @@ contract DelegatorSummaryMock {
         address user, 
         uint256 delegated, 
         uint256 undelegated, 
-        uint256 totalPendingWithdrawal, 
-        uint256 nPendingWithdrawals
+        uint256 totalPendingWithdrawal
     ) external {
         delegated = delegated / 1e10;
         undelegated = undelegated / 1e10;
-        totalPendingWithdrawal = totalPendingWithdrawal / 1e10;
 
         delegatorSummaries[user] = DelegatorSummary({
             delegated: uint64(delegated),
             undelegated: uint64(undelegated),
             totalPendingWithdrawal: uint64(totalPendingWithdrawal),
-            nPendingWithdrawals: uint64(nPendingWithdrawals)
+            nPendingWithdrawals: 0
         });
     }
 

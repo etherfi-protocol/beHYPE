@@ -12,6 +12,7 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
 
     address public stakingCore;
     IRoleRegistry public roleRegistry;
+    address public withdrawManager;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -22,13 +23,15 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         string calldata name,
         string calldata symbol,
         address _roleRegistry,
-        address _stakingCore) public initializer {
+        address _stakingCore,
+        address _withdrawManager) public initializer {
 
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
 
         roleRegistry = IRoleRegistry(_roleRegistry);
         stakingCore = _stakingCore;
+        withdrawManager = _withdrawManager;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
@@ -39,7 +42,7 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
     }
 
     function burn(address from, uint256 amount) external {
-        if (msg.sender != stakingCore) revert Unauthorized();
+        if (msg.sender != withdrawManager) revert Unauthorized();
         _burn(from, amount);
     }
 
@@ -48,6 +51,13 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         stakingCore = _stakingCore;
 
         emit StakingCoreUpdated(stakingCore);
+    }
+
+    function setWithdrawManager(address _withdrawManager) external {
+        roleRegistry.onlyProtocolUpgrader(msg.sender);
+        withdrawManager = _withdrawManager;
+
+        emit WithdrawManagerUpdated(withdrawManager);
     }
 
     function _authorizeUpgrade(

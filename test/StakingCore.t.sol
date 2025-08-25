@@ -24,14 +24,77 @@ contract StakingCoreTest is BaseTest {
 
     function test_ExchangeRatio() public {
         test_stake();
-        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0.01 ether, 0, 0, 0);
+
+        // 1% APR
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0.01 ether, 0, 0);
         vm.warp(block.timestamp + 365 days);
 
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
 
-        vm.warp(block.timestamp + 1);
+        assertEq(stakingCore.exchangeRatio(), 1.01 ether);
+        assertEq(stakingCore.BeHYPEToHYPE(1 ether), 1.01 ether);
+        assertEq(stakingCore.HYPEToBeHYPE(1 ether), 990099009900990099);
 
     }
 
+    function test_ExchangeRatio_should_revert_if_apr_exceeds_threshold() public {
+        test_stake();
+
+        // 5% APR
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0.05 ether, 0, 0);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IStakingCore.ExchangeRatioChangeExceedsThreshold.selector, 500));
+        stakingCore.updateExchangeRatio();
+    }
+
+    function test_ExchangeRatio_negative() public {
+        test_ExchangeRatio();
+
+        // -1% APR
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0, 0, 0);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(admin);
+        stakingCore.updateExchangeRatio();
+        assertEq(stakingCore.exchangeRatio(), 1 ether);
+        assertEq(stakingCore.BeHYPEToHYPE(1 ether), 1 ether);
+        assertEq(stakingCore.HYPEToBeHYPE(1 ether), 1 ether);
+    }
+
+    function test_ExchangeRatio_should_revert_if_apr_exceeds_threshold_negative() public {
+        test_ExchangeRatio();
+
+        // -10% APR (-0.01 in 1/10 year ~ -10% in apr)
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0, 0, 0);
+        vm.warp(block.timestamp + 36.5 days);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IStakingCore.ExchangeRatioChangeExceedsThreshold.selector, 990));
+        stakingCore.updateExchangeRatio();
+    }
+
+    // function test_MockDepositToHyperCore() public {
+    //     test_stake();
+
+    //     uint256 balanceBefore = address(stakingCore).balance;
+    //     uint256 totalPooledEtherBefore = stakingCore.getTotalProtocolHype();
+
+    //     mockDepositToHyperCore(1 ether);
+
+    //     assertEq(address(stakingCore).balance, balanceBefore - 1 ether);
+    //     assertEq(stakingCore.getTotalProtocolHype(), totalPooledEtherBefore);
+    // }
+
+    function test_precompiles() public {
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 1 ether, 0, 0);
+
+        assertEq(stakingCore.getTotalProtocolHype(), 1 ether);
+
+        SpotBalanceMock(SPOT_BALANCE_PRECOMPILE_ADDRESS).setSpotHypeBalance(address(stakingCore), 1 ether);
+
+        assertEq(stakingCore.getTotalProtocolHype(), 2 ether);
+    }
 }
