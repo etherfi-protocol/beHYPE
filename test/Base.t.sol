@@ -91,8 +91,8 @@ contract BaseTest is Test {
                 address(roleRegistry), 
                 address(beHYPE),
                 address(stakingCore),
-                5000 ether,
-                1 ether
+                10 ether,
+                1 days
             )
         ))));
 

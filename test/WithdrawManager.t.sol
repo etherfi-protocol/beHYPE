@@ -80,12 +80,16 @@ contract WithdrawManagerTest is BaseTest {
         uint256 userBalanceBefore = user.balance;
         beHYPE.approve(address(withdrawManager), 1 ether);
         withdrawManager.withdraw(1 ether, true);
-       
+        
         uint256 instantWithdrawalFee = 0.003 ether; // 30 bps fee on 1 ether
         assertEq(beHYPE.balanceOf(roleRegistry.protocolTreasury()), instantWithdrawalFee);
         assertEq(user.balance, userBalanceBefore + 0.997 ether);
         assertEq(beHYPE.balanceOf(address(withdrawManager)), 0 ether);
         assertEq(withdrawManager.totalInstantWithdrawableAmount(), 0);
+
+        beHYPE.approve(address(withdrawManager), 1 ether);
+        vm.expectRevert(IWithdrawManager.InsufficientHYPELiquidity.selector);
+        withdrawManager.withdraw(0.1 ether, true);
     }
 
     function test_instantWithdrawal_with_exchange_rate() public {
@@ -94,6 +98,28 @@ contract WithdrawManagerTest is BaseTest {
         vm.prank(user);
         stakingCore.stake{value: 89 ether}("");
         assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
+
+        mockDepositToHyperCore(98 ether);
+
+        // update exchange rate to 1 BeHYPE = 1.1 HYPE
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 10 ether, 0, 0);
+        vm.warp(block.timestamp + (365 days * 10));
+        vm.prank(admin);
+        stakingCore.updateExchangeRatio();
+        assertEq(stakingCore.BeHYPEToHYPE(1 ether), 1.1 ether);
+
+        uint256 userBalanceBefore = user.balance;
+
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 1 ether);
+        withdrawManager.withdraw(1 ether, true);
+
+        assertEq(beHYPE.balanceOf(roleRegistry.protocolTreasury()), 0.003 ether);
+        assertEq(user.balance - userBalanceBefore, stakingCore.BeHYPEToHYPE(0.997 ether));
+
+        beHYPE.approve(address(withdrawManager), 1 ether);
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InsufficientHYPELiquidity.selector));
+        withdrawManager.withdraw(0.1 ether, true);
     }
 
     /**
@@ -101,24 +127,26 @@ contract WithdrawManagerTest is BaseTest {
      * This test verifies that the bucket rate limiter correctly prevents
      * withdrawals that exceed the configured capacity
      */
-    // function test_instantWithdrawalRateLimit() public {
-    //     // Setup: Give user enough beHYPE for multiple withdrawals
-    //     _mintTokens(user, 20 ether);
+    function test_instantWithdrawalRateLimit() public {
+        vm.deal(user, 1000 ether);
+
+        vm.startPrank(user);
+        stakingCore.stake{value: 1000 ether}("");
         
-    //     vm.startPrank(user);
-    //     beHYPE.approve(address(withdrawManager), 20 ether);
+        // First withdrawal should succeed
+        beHYPE.approve(address(withdrawManager), 15 ether);
+        withdrawManager.withdraw(5 ether, true);
         
-    //     // First withdrawal should succeed
-    //     withdrawManager.withdraw(5 ether, true);
+        // Second withdrawal should also succeed (within bucket capacity)
+        withdrawManager.withdraw(5 ether, true);
         
-    //     // Second withdrawal should also succeed (within bucket capacity)
-    //     withdrawManager.withdraw(5 ether, true);
-        
-    //     // Third withdrawal should fail due to rate limiting
-    //     vm.expectRevert("BucketRateLimiter: rate limit exceeded");
-    //     withdrawManager.withdraw(5 ether, true);
-    //     vm.stopPrank();
-    // }
+        // Third withdrawal should fail due to rate limiting
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
+        withdrawManager.withdraw(5 ether, true);
+
+        vm.warp(block.timestamp + 1 days);
+        withdrawManager.withdraw(5 ether, true);
+    }
 
     // /**
     //  * @dev Tests instant withdrawal low watermark check

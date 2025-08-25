@@ -36,6 +36,7 @@ interface IWithdrawManager {
     error TransferFailed();
     error WithdrawalsNotPaused();
     error InsufficientHYPELiquidity();
+    error InstantWithdrawalRateLimitExceeded();
     error InvalidInstantWithdrawalFee();
 
     /* ========== EVENTS ========== */

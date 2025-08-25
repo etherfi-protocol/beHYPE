@@ -114,7 +114,7 @@ contract BeHYPETest is BaseTest {
         uint256 mintAmount = 100 ether;
         uint256 burnAmount = 50 ether;
 
-        // First mint tokensE
+        // First mint tokensEWh
         _mintTokens(user, mintAmount);
         assertEq(beHYPE.balanceOf(user), mintAmount);
         assertEq(beHYPE.totalSupply(), mintAmount);

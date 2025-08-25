@@ -65,7 +65,7 @@ contract WithdrawManager is
         address _beHypeToken,
         address _stakingCore,
         uint256 _bucketCapacity,
-        uint256 _bucketRefillRate
+        uint64 _bucketRefillRate
     ) public initializer {
         
         __ReentrancyGuard_init();
@@ -81,7 +81,7 @@ contract WithdrawManager is
 
         instantWithdrawalLimit = BucketLimiter.create(
             _convertToBucketUnit(_bucketCapacity, Math.Rounding.Floor), 
-            _convertToBucketUnit(_bucketRefillRate, Math.Rounding.Floor)
+            _bucketRefillRate
         );
 
         withdrawalQueue.push(WithdrawalEntry({
@@ -104,10 +104,11 @@ contract WithdrawManager is
 
         if (instant) {
             uint256 hypeAmount = stakingCore.BeHYPEToHYPE(beHypeAmount);
-            if (!canInstantWithdraw(hypeAmount)) revert InsufficientHYPELiquidity();
-
-            // Update rate limit - this will revert if rate limit exceeded
+            
+            // Check rate limit first - this will revert if rate limit is exceeded
             _updateRateLimit(hypeAmount);
+            
+            if (!canInstantWithdraw(hypeAmount)) revert InsufficientHYPELiquidity();
 
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
 
@@ -201,15 +202,13 @@ contract WithdrawManager is
         BucketLimiter.setCapacity(instantWithdrawalLimit, bucketUnit);
     }
 
-    /**
+     /**
      * @dev Sets the rate at which the bucket is refilled per second.
      * @param refillRate The rate at which the bucket is refilled per second in HYPE.
      */
-    function setInstantWithdrawalRefillRatePerSecond(uint256 refillRate) external {
+    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        // max refillRate = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE per second, which is practically enough
-        uint64 bucketUnit = _convertToBucketUnit(refillRate, Math.Rounding.Floor);
-        BucketLimiter.setRefillRate(instantWithdrawalLimit, bucketUnit);
+        BucketLimiter.setRefillRate(instantWithdrawalLimit, refillRate);
     }
 
     function pauseWithdrawals() external {
@@ -250,11 +249,8 @@ contract WithdrawManager is
      */
     function canInstantWithdraw(uint256 hypeAmount) public view returns (bool) {
         if (getLiquidHypeAmount() < lowWatermarkInHYPE()) return false;
-
-        uint64 bucketUnit = _convertToBucketUnit(hypeAmount, Math.Rounding.Ceil);
-        bool consumable = BucketLimiter.canConsume(instantWithdrawalLimit, bucketUnit);
         
-        return consumable && hypeAmount <= getLiquidHypeAmount();
+        return hypeAmount <= getLiquidHypeAmount();
     }
 
     /**
@@ -263,9 +259,7 @@ contract WithdrawManager is
     function totalInstantWithdrawableAmount() external view returns (uint256) {
         if (getLiquidHypeAmount() < lowWatermarkInHYPE()) return 0;
         
-        uint64 consumableBucketUnits = BucketLimiter.consumable(instantWithdrawalLimit);
-        uint256 consumableAmount = _convertFromBucketUnit(consumableBucketUnits);
-        return Math.min(consumableAmount, getLiquidHypeAmount());
+        return getLiquidHypeAmount();
     }
 
     /**
@@ -310,7 +304,7 @@ contract WithdrawManager is
 
     function _updateRateLimit(uint256 amount) internal {
         uint64 bucketUnit = _convertToBucketUnit(amount, Math.Rounding.Ceil);
-        require(BucketLimiter.consume(instantWithdrawalLimit, bucketUnit), "BucketRateLimiter: rate limit exceeded");
+        if (!BucketLimiter.consume(instantWithdrawalLimit, bucketUnit)) revert InstantWithdrawalRateLimitExceeded();
     }
 
     function _convertToBucketUnit(uint256 amount, Math.Rounding rounding) internal pure returns (uint64) {
