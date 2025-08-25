@@ -65,7 +65,35 @@ contract WithdrawManagerTest is BaseTest {
     /* ========== INSTANT WITHDRAWAL TESTS ========== */
 
     function test_instantWithdrawal() public {
-        
+        vm.deal(user, 100 ether);
+
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+        assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
+
+        mockDepositToHyperCore(99 ether);
+
+        assertEq(withdrawManager.getLiquidHypeAmount(), 1 ether);
+
+        // 1 ether should be able to be withdrawn instantly
+        vm.startPrank(user);
+        uint256 userBalanceBefore = user.balance;
+        beHYPE.approve(address(withdrawManager), 1 ether);
+        withdrawManager.withdraw(1 ether, true);
+       
+        uint256 instantWithdrawalFee = 0.003 ether; // 30 bps fee on 1 ether
+        assertEq(beHYPE.balanceOf(roleRegistry.protocolTreasury()), instantWithdrawalFee);
+        assertEq(user.balance, userBalanceBefore + 0.997 ether);
+        assertEq(beHYPE.balanceOf(address(withdrawManager)), 0 ether);
+        assertEq(withdrawManager.totalInstantWithdrawableAmount(), 0);
+    }
+
+    function test_instantWithdrawal_with_exchange_rate() public {
+        vm.deal(user, 100 ether);
+
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+        assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
     }
 
     /**

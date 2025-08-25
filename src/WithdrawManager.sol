@@ -112,17 +112,18 @@ contract WithdrawManager is
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
 
             uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
-            beHypeToken.transferFrom(address(this), roleRegistry.protocolTreasury(), instantWithdrawalFee);
+            beHypeToken.transfer(roleRegistry.protocolTreasury(), instantWithdrawalFee);
 
             uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
             uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
 
             beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
 
+            stakingCore.sendToWithdrawManager(hypeWithdrawalAfterFee);
             (bool success, ) = payable(msg.sender).call{value: hypeWithdrawalAfterFee}("");
             if (!success) revert TransferFailed();
 
-            emit InstantWithdrawal(msg.sender, beHypeWithdrawalAfterFee, hypeWithdrawalAfterFee);
+            emit InstantWithdrawal(msg.sender, beHypeAmount, hypeWithdrawalAfterFee, instantWithdrawalFee);
 
         } else {
             withdrawalId = withdrawalQueue.length;

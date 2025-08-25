@@ -14,9 +14,12 @@ import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
 import {SpotBalanceMock} from "./mock/SpotBalanceMock.sol";
 import {DelegatorSummaryMock} from "./mock/DelegatorSummaryMock.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "forge-std/console.sol";
 
 contract BaseTest is Test {
+    using Math for uint256;
+    
     BeHYPE public beHYPE;
     RoleRegistry public roleRegistry;
     WithdrawManager public withdrawManager;
@@ -129,15 +132,13 @@ contract BaseTest is Test {
 
 
     function mockDepositToHyperCore(uint256 amount) public {
-        
         L1Read.SpotBalance memory spotBalanceBefore = L1Read(L1_READ_PRECOMPILE_ADDRESS).spotBalance(address(stakingCore), 150);
 
         vm.prank(admin);
         stakingCore.depositToHyperCore(amount);
 
-        uint256 newTotalInSpotAccount = spotBalanceBefore.total + _convertTo8Decimals(amount);
+        uint256 newTotalInSpotAccount = _convertTo18Decimals(spotBalanceBefore.total) + amount;
 
         SpotBalanceMock(SPOT_BALANCE_PRECOMPILE_ADDRESS).setSpotHypeBalance(address(stakingCore), newTotalInSpotAccount);
-
     }
 }

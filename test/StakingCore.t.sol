@@ -76,25 +76,15 @@ contract StakingCoreTest is BaseTest {
         stakingCore.updateExchangeRatio();
     }
 
-    // function test_MockDepositToHyperCore() public {
-    //     test_stake();
+    function test_MockDepositToHyperCore() public {
+        test_stake();
 
-    //     uint256 balanceBefore = address(stakingCore).balance;
-    //     uint256 totalPooledEtherBefore = stakingCore.getTotalProtocolHype();
+        uint256 balanceBefore = address(stakingCore).balance;
+        uint256 totalPooledEtherBefore = stakingCore.getTotalProtocolHype();
 
-    //     mockDepositToHyperCore(1 ether);
+        mockDepositToHyperCore(1 ether);
 
-    //     assertEq(address(stakingCore).balance, balanceBefore - 1 ether);
-    //     assertEq(stakingCore.getTotalProtocolHype(), totalPooledEtherBefore);
-    // }
-
-    function test_precompiles() public {
-        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 1 ether, 0, 0);
-
-        assertEq(stakingCore.getTotalProtocolHype(), 1 ether);
-
-        SpotBalanceMock(SPOT_BALANCE_PRECOMPILE_ADDRESS).setSpotHypeBalance(address(stakingCore), 1 ether);
-
-        assertEq(stakingCore.getTotalProtocolHype(), 2 ether);
+        assertEq(address(stakingCore).balance, balanceBefore - 1 ether);
+        assertEq(stakingCore.getTotalProtocolHype(), totalPooledEtherBefore);
     }
 }

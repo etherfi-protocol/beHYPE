@@ -70,8 +70,9 @@ interface IWithdrawManager {
     
     event InstantWithdrawal(
         address indexed user,
-        uint256 beHypeAmount,
-        uint256 hypeAmount
+        uint256 beHypeAmountWithdrawn,
+        uint256 hypeAmountReceived,
+        uint256 beHypeInstantWithdrawalFee
     );
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
