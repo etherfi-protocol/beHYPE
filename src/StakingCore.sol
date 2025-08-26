@@ -10,6 +10,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {IRoleRegistry} from "./interfaces/IRoleRegistry.sol";
 import {IBeHYPEToken} from "./interfaces/IBeHYPE.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
+import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {L1Read} from "./lib/L1Read.sol";
 import {CoreWriter} from "./lib/CoreWriter.sol";
 import {console} from "forge-std/console.sol";
@@ -45,6 +46,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         uint32 _acceptablAprInBps,
         bool _exchangeRateGuard
     ) public initializer {
+        __UUPSUpgradeable_init();
 
         roleRegistry = IRoleRegistry(_roleRegistry);
         beHypeToken = IBeHYPEToken(_beHype);
@@ -103,11 +105,11 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit ExchangeRatioUpdated(oldRatio, exchangeRatio, yearlyRateInBps16);
     }
 
-    function sendToWithdrawManager(uint256 amount) external {
+    function sendFromWithdrawManager(uint256 amount, address to) external {
         if (msg.sender != withdrawManager) revert NotAuthorized();
 
-        (bool success,) = payable(withdrawManager).call{value: amount}("");
-        if (!success) revert FailedToSendToWithdrawManager();
+        (bool success,) = payable(to).call{value: amount}("");
+        if (!success) revert FailedToSendFromWithdrawManager();
     }
 
     function setWithdrawManager(address _withdrawManager) external {
@@ -137,6 +139,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromHyperCore(uint amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
         _encodeAction(6, abi.encode(address(this), HYPE_TOKEN_ID, amount));
         emit HyperCoreWithdraw(amount);
@@ -151,6 +154,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromStaking(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
         _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
         emit HyperCoreStakingWithdraw(amount);

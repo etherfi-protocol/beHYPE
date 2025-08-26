@@ -67,7 +67,7 @@ contract WithdrawManager is
         uint256 _bucketCapacity,
         uint64 _bucketRefillRate
     ) public initializer {
-        
+        __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
         minWithdrawalAmount = _minStakeAmount;
@@ -88,7 +88,7 @@ contract WithdrawManager is
             user: address(0),
             beHypeAmount: 0,
             hypeAmount: 0,
-            claimed: true
+            finalized: true
         }));
     }
     
@@ -118,14 +118,11 @@ contract WithdrawManager is
 
             beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
 
-            stakingCore.sendToWithdrawManager(hypeWithdrawalAfterFee);
-            (bool success, ) = payable(msg.sender).call{value: hypeWithdrawalAfterFee}("");
-            if (!success) revert TransferFailed();
+            stakingCore.sendFromWithdrawManager(hypeWithdrawalAfterFee, msg.sender);
 
             emit InstantWithdrawal(msg.sender, beHypeAmount, hypeWithdrawalAfterFee, instantWithdrawalFee);
         } else {
             withdrawalId = withdrawalQueue.length;
-        
             hypeRequestedForWithdraw += hypeAmount;
         
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
@@ -134,7 +131,7 @@ contract WithdrawManager is
                 user: msg.sender,
                 beHypeAmount: beHypeAmount,
                 hypeAmount: hypeAmount,
-                claimed: false
+                finalized: false
             }));
         
             userWithdrawals[msg.sender].push(withdrawalId);
@@ -143,38 +140,29 @@ contract WithdrawManager is
         }
         
     }
-    
-    function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
-        if (paused()) revert WithdrawalsPaused();
-        if (!canClaimWithdrawal(withdrawalId)) revert WithdrawalNotFinalized();
-        
-        _claimWithdrawal(withdrawalId);
-    }
 
     /* ========== ADMIN FUNCTIONS ========== */
 
     function finalizeWithdrawals(uint256 index) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (index >= withdrawalQueue.length) revert IndexOutOfBounds();
-        if (index < lastFinalizedIndex) revert CanOnlyFinalizeForward();
+        if (index <= lastFinalizedIndex) revert CanOnlyFinalizeForward();
+
 
         uint256 hypeAmountToFinalize = 0;
         uint256 beHypeAmountToFinalize = 0;
         for (uint256 i = lastFinalizedIndex + 1; i <= index;) {
-            hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
+            stakingCore.sendFromWithdrawManager(withdrawalQueue[i].hypeAmount, withdrawalQueue[i].user);
             beHypeAmountToFinalize += withdrawalQueue[i].beHypeAmount;
+            hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
+            withdrawalQueue[i].finalized = true;
 
             unchecked { ++i; }
         }
 
-        uint256 liquidHypeAmount = getLiquidHypeAmount();
-        if (liquidHypeAmount < hypeAmountToFinalize) revert InsufficientHYPELiquidity(); 
-
-        hypeRequestedForWithdraw -= hypeAmountToFinalize;
         lastFinalizedIndex = index;
-
-        stakingCore.sendToWithdrawManager(hypeAmountToFinalize);
         beHypeToken.burn(address(this), beHypeAmountToFinalize);
+        hypeRequestedForWithdraw -= hypeAmountToFinalize;
 
         emit WithdrawalsBatchFinalized(index);
     }
@@ -215,25 +203,23 @@ contract WithdrawManager is
     function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory) {
         return withdrawalQueue[index];
     }
-
-    function canClaimWithdrawal(uint256 withdrawalId) public view returns (bool) {
-        if (withdrawalId >= withdrawalQueue.length) return false;
-        if (withdrawalId > lastFinalizedIndex) return false;
-        
-        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
-        return !entry.claimed;
-    }
     
-    function getUserUnclaimedWithdrawals(address user) external view returns (uint256[] memory) {
-        uint256[] memory unclaimedWithdrawals = new uint256[](userWithdrawals[user].length);
-        
+    function getUserUnFinalizedWithdrawals(address user) external view returns (uint256[] memory) {
+        uint256[] memory unFinalizedWithdrawals = new uint256[](userWithdrawals[user].length);
+        uint256 count = 0;
         for (uint256 i = 0; i < userWithdrawals[user].length; i++) {
             WithdrawalEntry storage entry = withdrawalQueue[userWithdrawals[user][i]];
-            if (!entry.claimed && entry.hypeAmount > 0) {
-                unclaimedWithdrawals[i] = userWithdrawals[user][i];
+            if (!entry.finalized) {
+                unFinalizedWithdrawals[count] = userWithdrawals[user][i];
+                count++;
             }
         }
-        return unclaimedWithdrawals;
+
+        assembly {
+            mstore(unFinalizedWithdrawals, count)
+        }
+
+        return unFinalizedWithdrawals;
     }
 
     /**
@@ -254,11 +240,11 @@ contract WithdrawManager is
     }
 
     /**
-     * @dev HYPE is transferred from `StakingCore` to the `WithdrawalManager` when a withdrawal is finalized.
-     * Hence the difference between the staking core's balance and this contract's balance is the liquid hype amount.
+     * @dev The staking core's balance is our liquid hype amount.
+     * Hype is transferred from `StakingCore` to the `WithdrawalManager` when a withdrawal is finalized.
      */
     function getLiquidHypeAmount() public view returns (uint256) {
-        return address(stakingCore).balance - address(this).balance;
+        return address(stakingCore).balance;
     }
     
     function getPendingWithdrawalsCount() external view returns (uint256) {
@@ -271,23 +257,6 @@ contract WithdrawManager is
     }
     
     /* ========== INTERNAL FUNCTIONS ========== */
-
-    function _claimWithdrawal(uint256 index) internal {
-        if (index >= withdrawalQueue.length) revert InvalidWithdrawalID();
-
-        WithdrawalEntry storage entry = withdrawalQueue[index];
-        if (entry.claimed) revert AlreadyClaimed();
-
-        uint256 hypeAmount = entry.hypeAmount;
-        uint256 beHypeAmount = entry.beHypeAmount;
-        
-        entry.claimed = true;
-        
-        (bool success, ) = payable(entry.user).call{value: hypeAmount}("");
-        if (!success) revert TransferFailed();
-        
-        emit WithdrawalClaimed(entry.user, index, hypeAmount);
-    }
 
     function _updateRateLimit(uint256 amount) internal {
         uint64 bucketUnit = _convertToBucketUnit(amount, Math.Rounding.Ceil);

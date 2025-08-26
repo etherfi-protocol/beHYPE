@@ -21,7 +21,7 @@ interface IStakingCore {
     error FailedToDepositToHyperCore();
     error StakingPaused();
     error ElapsedTimeCannotBeZero();
-    error FailedToSendToWithdrawManager();
+    error FailedToSendFromWithdrawManager();
 
     /* ========== EVENTS ========== */
 
@@ -97,6 +97,17 @@ interface IStakingCore {
      */
     function updateExchangeRatio() external;
 
+
+    /**
+     * @notice Withdraws HYPE from HyperCore
+     * @param amount The amount of HYPE to withdraw in wei
+     * @dev Only callable by accounts with PROTOCOL_GOVERNOR role
+     * @dev Sends Action 5 to CoreWriter for HyperCore processing
+     * @dev Emits StakingWithdraw event
+     * @dev Reverts if the amount is greater than the pending hype withdrawal amount
+     */
+    function withdrawFromHyperCore(uint256 amount) external;
+
     /**
      * @notice Deposits HYPE to staking via CoreWriter Action 4
      * @param amount The amount of HYPE to deposit in wei
@@ -112,6 +123,7 @@ interface IStakingCore {
      * @dev Only callable by accounts with PROTOCOL_ADMIN role
      * @dev Sends Action 5 to CoreWriter for HyperCore processing
      * @dev Emits StakingWithdraw event
+     * @dev Reverts if the amount is greater than the pending hype withdrawal amount
      */
     function withdrawFromStaking(uint256 amount) external;
 
@@ -127,11 +139,12 @@ interface IStakingCore {
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external;
 
     /**
-     * @notice Sends HYPE to the withdraw manager
+     * @notice Allows the withdraw manager to send HYPE to the user
      * @param amount The amount of HYPE to send
+     * @param to The address to send the HYPE to
      * @dev Only callable by the withdraw manager
      */
-    function sendToWithdrawManager(uint256 amount) external;
+    function sendFromWithdrawManager(uint256 amount, address to) external;
 
     /**
      * @notice Pauses staking

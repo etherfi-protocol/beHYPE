@@ -7,6 +7,7 @@ import {UUPSProxy} from "../src/lib/UUPSProxy.sol";
 import {BeHYPE} from "../src/BeHYPE.sol";
 import {RoleRegistry} from "../src/RoleRegistry.sol";
 import {StakingCore} from "../src/StakingCore.sol";
+import {CoreWriter} from "../src/lib/CoreWriter.sol";
 import {WithdrawManager} from "../src/WithdrawManager.sol";
 import {StakingCore} from "../src/StakingCore.sol";
 import {IStakingCore} from "../src/interfaces/IStakingCore.sol";
@@ -35,6 +36,7 @@ contract BaseTest is Test {
     address constant DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000805;
     // TODO: add this to an address registry bc its one of our deployed address and not a precompile
     address constant L1_READ_PRECOMPILE_ADDRESS = 0xb7467E0524Afba7006957701d1F06A59000d15A2;
+    address constant CORE_WRITER_PRECOMPILE_ADDRESS = 0x3333333333333333333333333333333333333333;
 
     function _getProxyImplementation(address proxy) internal view returns (address) {
         bytes32 implSlot = vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT);
@@ -45,10 +47,12 @@ contract BaseTest is Test {
         SpotBalanceMock spotBalanceMock = new SpotBalanceMock();
         DelegatorSummaryMock delegatorSummaryMock = new DelegatorSummaryMock();
         L1Read l1Read = new L1Read();
-        
+        CoreWriter coreWriter = new CoreWriter();
+
         vm.etch(SPOT_BALANCE_PRECOMPILE_ADDRESS, address(spotBalanceMock).code);
         vm.etch(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, address(delegatorSummaryMock).code);
         vm.etch(L1_READ_PRECOMPILE_ADDRESS, address(l1Read).code);
+        vm.etch(CORE_WRITER_PRECOMPILE_ADDRESS, address(coreWriter).code);
         
         RoleRegistry roleRegistryImpl = new RoleRegistry();
         roleRegistry = RoleRegistry(address(new UUPSProxy(
