@@ -220,4 +220,21 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(address(withdrawManager).balance, 57 ether);
 
     }
+    function test_RevertUpgradeUnauthorized() public {
+        WithdrawManager newWithdrawManagerImpl = new WithdrawManager();
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.OnlyProtocolUpgrader.selector));
+        withdrawManager.upgradeToAndCall(address(newWithdrawManagerImpl), "");
+    }
+
+    function test_UpgradeSuccess() public {
+        WithdrawManager newWithdrawManagerImpl = new WithdrawManager();
+
+        vm.prank(admin);
+        withdrawManager.upgradeToAndCall(address(newWithdrawManagerImpl), "");
+
+        assertEq(withdrawManager.getPendingWithdrawalsCount(), 0);
+    }
+
 }

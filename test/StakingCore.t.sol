@@ -87,4 +87,22 @@ contract StakingCoreTest is BaseTest {
         assertEq(address(stakingCore).balance, balanceBefore - 1 ether);
         assertEq(stakingCore.getTotalProtocolHype(), totalPooledEtherBefore);
     }
+
+    function test_RevertUpgradeUnauthorized() public {
+        StakingCore newStakingCoreImpl = new StakingCore();
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.OnlyProtocolUpgrader.selector));
+        stakingCore.upgradeToAndCall(address(newStakingCoreImpl), "");
+    }
+
+    function test_UpgradeSuccess() public {
+        StakingCore newStakingCoreImpl = new StakingCore();
+
+        vm.prank(admin);
+        stakingCore.upgradeToAndCall(address(newStakingCoreImpl), "");
+
+        assertEq(stakingCore.exchangeRatio(), 1 ether);
+    }
+
 }

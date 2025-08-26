@@ -189,7 +189,7 @@ contract BeHYPETest is BaseTest {
         BeHYPE newBeHYPEImpl = new BeHYPE();
 
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(RoleRegistry.OnlyProtocolUpgrader.selector));
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.OnlyProtocolUpgrader.selector));
         beHYPE.upgradeToAndCall(address(newBeHYPEImpl), "");
     }
 }

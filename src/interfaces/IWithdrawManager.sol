@@ -115,7 +115,7 @@ interface IWithdrawManager {
     function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool);
     
     /**
-     * @notice Check if a withdrawal can be instant withdrawn
+     * @notice Check if a withdrawal amount can be instant withdrawn
      * @param beHypeAmount Amount of beHYPE tokens to withdraw
      * @return bool True if the withdrawal can be instant withdrawn
      */

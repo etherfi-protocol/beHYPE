@@ -11,6 +11,7 @@ import {WithdrawManager} from "../src/WithdrawManager.sol";
 import {StakingCore} from "../src/StakingCore.sol";
 import {IStakingCore} from "../src/interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
+import {IRoleRegistry} from "../src/interfaces/IRoleRegistry.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
 import {SpotBalanceMock} from "./mock/SpotBalanceMock.sol";
 import {DelegatorSummaryMock} from "./mock/DelegatorSummaryMock.sol";

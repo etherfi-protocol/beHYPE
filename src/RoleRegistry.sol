@@ -6,12 +6,13 @@ import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/proxy/ut
 import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
+import {IRoleRegistry} from "./interfaces/IRoleRegistry.sol";
 
 /// @title RoleRegistry - An upgradeable role-based access control system
 /// @notice Provides functionality for managing and querying roles with enumeration capabilities
 /// @dev Implements UUPS upgradeability pattern and uses Solady's EnumerableRoles for efficient role management
 /// @author EtherFi
-contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, EnumerableRoles {
+contract RoleRegistry is IRoleRegistry, Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, EnumerableRoles {
     bytes32 public constant PROTOCOL_PAUSER = keccak256("PROTOCOL_PAUSER");
     bytes32 public constant PROTOCOL_ADMIN = keccak256("PROTOCOL_ADMIN");
     bytes32 public constant PROTOCOL_GUARDIAN = keccak256("PROTOCOL_GUARDIAN");
@@ -19,9 +20,6 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     IWithdrawManager public withdrawManager;
     IStakingCore public stakingCore;
     address public protocolTreasury;
-
-    error OnlyProtocolUpgrader();
-    error NotAuthorized();
 
     /// @notice Returns the maximum allowed role value
     /// @dev This is used by EnumerableRoles._validateRole to ensure roles are within valid range
@@ -89,17 +87,23 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function setProtocolTreasury(address _protocolTreasury) public {
         if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+
         protocolTreasury = _protocolTreasury;
+        emit ProtocolTreasuryUpdated(_protocolTreasury);
     }
 
     function setWithdrawManager(address _withdrawManager) public {
         if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+
         withdrawManager = IWithdrawManager(_withdrawManager);
+        emit WithdrawManagerUpdated(_withdrawManager);
     }
 
     function setStakingCore(address _stakingCore) public {
         if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+
         stakingCore = IStakingCore(_stakingCore);
+        emit StakingCoreUpdated(_stakingCore);
     }   
 
     function pauseProtocol() public {
@@ -107,6 +111,7 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         withdrawManager.pauseWithdrawals();
         stakingCore.pauseStaking();
+        emit ProtocolPaused();
     }
 
     function unpauseProtocol() public {
@@ -114,6 +119,7 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         withdrawManager.unpauseWithdrawals();
         stakingCore.unpauseStaking();
+        emit ProtocolUnpaused();
     }
 
     function onlyProtocolUpgrader(address account) public view {

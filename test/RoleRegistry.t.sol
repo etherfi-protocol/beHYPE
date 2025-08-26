@@ -5,6 +5,10 @@ import {BaseTest} from "./Base.t.sol";
 import {RoleRegistry} from "../src/RoleRegistry.sol";
 import {IStakingCore} from "../src/interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
+import {IRoleRegistry} from "../src/interfaces/IRoleRegistry.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
 
 contract RoleRegistryTest is BaseTest {
     address public guardian = makeAddr("guardian");
@@ -33,7 +37,7 @@ contract RoleRegistryTest is BaseTest {
         address newTreasury = makeAddr("newTreasury");
         
         vm.prank(unauthorized);
-        vm.expectRevert(RoleRegistry.NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.NotAuthorized.selector));
         roleRegistry.setProtocolTreasury(newTreasury);
     }
 
@@ -53,7 +57,7 @@ contract RoleRegistryTest is BaseTest {
 
     function test_pauseProtocol_revertIfNotPauser() public {
         vm.prank(unauthorized);
-        vm.expectRevert(RoleRegistry.NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.NotAuthorized.selector));
         roleRegistry.pauseProtocol();
     }
 
@@ -82,7 +86,7 @@ contract RoleRegistryTest is BaseTest {
         roleRegistry.pauseProtocol();
         
         vm.prank(unauthorized);
-        vm.expectRevert(RoleRegistry.NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.NotAuthorized.selector));
         roleRegistry.unpauseProtocol();
     }
 
@@ -118,6 +122,49 @@ contract RoleRegistryTest is BaseTest {
         stakingCore.stake{value: 1 ether}("test");
         beHYPE.approve(address(withdrawManager), 1 ether);
         withdrawManager.withdraw(1 ether, false);
+    }
+
+    function test_RevertUpgradeUnauthorized() public {
+        RoleRegistry newRoleRegistryImpl = new RoleRegistry();
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, user));
+        roleRegistry.upgradeToAndCall(address(newRoleRegistryImpl), "");
+    }
+
+    function test_UpgradeSuccess() public {
+        RoleRegistry newRoleRegistryImpl = new RoleRegistry();
+
+        vm.prank(admin);
+        roleRegistry.upgradeToAndCall(address(newRoleRegistryImpl), "");
+
+        assertEq(roleRegistry.protocolTreasury(), protocolTreasury);
+    }
+
+    function test_TwoStepOwnershipTransfer() public {
+        address newOwner = makeAddr("newOwner");
+        
+        vm.prank(admin);
+        roleRegistry.transferOwnership(newOwner);
+        
+        assertEq(roleRegistry.pendingOwner(), newOwner);
+        assertEq(roleRegistry.owner(), admin);
+        
+        vm.prank(newOwner);
+        roleRegistry.acceptOwnership();
+        
+        assertEq(roleRegistry.owner(), newOwner);
+        assertEq(roleRegistry.pendingOwner(), address(0));
+        
+        bytes32 guardianRole = roleRegistry.PROTOCOL_GUARDIAN();
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(EnumerableRoles.EnumerableRolesUnauthorized.selector));
+        roleRegistry.grantRole(guardianRole, makeAddr("newGuardian"));
+        
+        address newGuardian = makeAddr("newGuardian");
+        vm.prank(newOwner);
+        roleRegistry.grantRole(guardianRole, newGuardian);
+        assertTrue(roleRegistry.hasRole(guardianRole, newGuardian));
     }
 
 }

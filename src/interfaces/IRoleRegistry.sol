@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
+
+import {IWithdrawManager} from "./IWithdrawManager.sol";
+import {IStakingCore} from "./IStakingCore.sol";
 
 /**
  * @title IRoleRegistry
@@ -14,6 +17,41 @@ interface IRoleRegistry {
     error OnlyProtocolUpgrader();
 
     /**
+     * @dev Error thrown when a function is called by an unauthorized account
+     */
+    error NotAuthorized();
+
+    /* ========== EVENTS ========== */
+
+    /**
+     * @notice Emitted when the protocol treasury is updated
+     * @param _protocolTreasury The new protocol treasury address
+     */
+    event ProtocolTreasuryUpdated(address _protocolTreasury);
+
+    /**
+     * @notice Emitted when the withdraw manager is updated
+     * @param _withdrawManager The new withdraw manager address
+     */
+    event WithdrawManagerUpdated(address _withdrawManager);
+
+    /**
+     * @notice Emitted when the staking core is updated
+     * @param _stakingCore The new staking core address
+     */
+    event StakingCoreUpdated(address _stakingCore);
+
+    /**
+     * @notice Emitted when the protocol is paused
+     */
+    event ProtocolPaused();
+
+    /**
+     * @notice Emitted when the protocol is unpaused
+     */
+    event ProtocolUnpaused();
+
+    /**
      * @notice Returns the maximum allowed role value
      * @dev This is used by EnumerableRoles._validateRole to ensure roles are within valid range
      * @return The maximum role value
@@ -21,10 +59,13 @@ interface IRoleRegistry {
     function MAX_ROLE() external pure returns (uint256);
 
     /**
-     * @notice Initializes the contract with the specified owner
+     * @notice Initializes the contract with the specified parameters
      * @param _owner The address that will be set as the initial owner
+     * @param _withdrawManager The address of the withdraw manager contract
+     * @param _stakingCore The address of the staking core contract
+     * @param _protocolTreasury The address of the protocol treasury
      */
-    function initialize(address _owner) external;
+    function initialize(address _owner, address _withdrawManager, address _stakingCore, address _protocolTreasury) external;
 
     /**
      * @notice Checks if an account has any of the specified roles
@@ -80,13 +121,6 @@ interface IRoleRegistry {
     function PROTOCOL_PAUSER() external view returns (bytes32);
 
     /**
-     * @notice Returns the PROTOCOL_UNPAUSER role identifier
-     * @dev unpauses protocol actions
-     * @return The bytes32 identifier for the PROTOCOL_UNPAUSER role
-     */
-    function PROTOCOL_UNPAUSER() external view returns (bytes32);
-
-    /**
      * @notice Returns the PROTOCOL_ADMIN role identifier
      * @dev performs protocol admin actions
      * @return The bytes32 identifier for the PROTOCOL_ADMIN role
@@ -101,14 +135,55 @@ interface IRoleRegistry {
     function PROTOCOL_GUARDIAN() external view returns (bytes32);
 
     /**
+     * @notice Returns the withdraw manager contract address
+     * @return The address of the withdraw manager contract
+     */
+    function withdrawManager() external view returns (IWithdrawManager);
+
+    /**
+     * @notice Returns the staking core contract address
+     * @return The address of the staking core contract
+     */
+    function stakingCore() external view returns (IStakingCore);
+
+    /**
      * @notice Returns the protocol treasury address
      * @return The address of the protocol treasury
      */
     function protocolTreasury() external view returns (address);
 
+    /* ========== ADMIN FUNCTIONS ========== */
+
     /**
-     * @notice Returns the current owner of the contract
-     * @return The address of the current owner
+     * @notice Sets the protocol treasury address
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @param _protocolTreasury The new protocol treasury address
      */
-    function owner() external view returns (address);
+    function setProtocolTreasury(address _protocolTreasury) external;
+
+    /**
+     * @notice Sets the withdraw manager contract address
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @param _withdrawManager The new withdraw manager contract address
+     */
+    function setWithdrawManager(address _withdrawManager) external;
+
+    /**
+     * @notice Sets the staking core contract address
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @param _stakingCore The new staking core contract address
+     */
+    function setStakingCore(address _stakingCore) external;
+
+    /**
+     * @notice Pauses the protocol by pausing withdrawals and staking
+     * @dev Only callable by accounts with PROTOCOL_PAUSER role
+     */
+    function pauseProtocol() external;
+
+    /**
+     * @notice Unpauses the protocol by unpausing withdrawals and staking
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     */
+    function unpauseProtocol() external;
 }
