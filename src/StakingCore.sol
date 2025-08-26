@@ -13,7 +13,6 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {L1Read} from "./lib/L1Read.sol";
 import {CoreWriter} from "./lib/CoreWriter.sol";
-import {console} from "forge-std/console.sol";
 
 contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUpgradeable {
 

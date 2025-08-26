@@ -14,7 +14,6 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "./interfaces/IWithdrawManager.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {BucketLimiter} from "./lib/BucketLimiter.sol";
-import "forge-std/console.sol";
 
 contract WithdrawManager is
     Initializable,
