@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -13,7 +13,6 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
 /// @author EtherFi
 contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, EnumerableRoles {
     bytes32 public constant PROTOCOL_PAUSER = keccak256("PROTOCOL_PAUSER");
-    bytes32 public constant PROTOCOL_UNPAUSER = keccak256("PROTOCOL_UNPAUSER");
     bytes32 public constant PROTOCOL_ADMIN = keccak256("PROTOCOL_ADMIN");
     bytes32 public constant PROTOCOL_GUARDIAN = keccak256("PROTOCOL_GUARDIAN");
 
@@ -21,7 +20,6 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     IStakingCore public stakingCore;
     address public protocolTreasury;
 
-    // TODO- move to interface
     error OnlyProtocolUpgrader();
     error NotAuthorized();
 
@@ -37,11 +35,13 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _disableInitializers();
     }
 
-    function initialize(address _owner, address _protocolTreasury) public initializer {
+    function initialize(address _owner, address _withdrawManager, address _stakingCore, address _protocolTreasury) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         _transferOwnership(_owner);
 
+        withdrawManager = IWithdrawManager(_withdrawManager);
+        stakingCore = IStakingCore(_stakingCore);
         protocolTreasury = _protocolTreasury;
     }
 
@@ -92,16 +92,25 @@ contract RoleRegistry is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         protocolTreasury = _protocolTreasury;
     }
 
+    function setWithdrawManager(address _withdrawManager) public {
+        if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+        withdrawManager = IWithdrawManager(_withdrawManager);
+    }
+
+    function setStakingCore(address _stakingCore) public {
+        if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
+        stakingCore = IStakingCore(_stakingCore);
+    }   
+
     function pauseProtocol() public {
         if (!hasRole(PROTOCOL_PAUSER, msg.sender)) revert NotAuthorized();
 
-        // TODO: Maybe a try catch. What if first call fails bc already paused and second is never called?
         withdrawManager.pauseWithdrawals();
         stakingCore.pauseStaking();
     }
 
     function unpauseProtocol() public {
-        if (!hasRole(PROTOCOL_UNPAUSER, msg.sender)) revert NotAuthorized();
+        if (!hasRole(PROTOCOL_GUARDIAN, msg.sender)) revert NotAuthorized();
 
         withdrawManager.unpauseWithdrawals();
         stakingCore.unpauseStaking();

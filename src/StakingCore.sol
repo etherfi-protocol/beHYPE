@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.26;
 
 /* ========== IMPORTS ========== */
 
@@ -21,12 +21,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     IRoleRegistry public roleRegistry;
     IBeHYPEToken public beHypeToken;
     address public withdrawManager;
-    /* ========== CONSTANTS ========== */
-
     uint256 public exchangeRatio;
     uint32 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
+
+    /* ========== CONSTANTS ========== */
+
     uint64 public constant HYPE_TOKEN_ID = 150;
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read public constant l1Read = L1Read(0xb7467E0524Afba7006957701d1F06A59000d15A2);
@@ -89,9 +90,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         uint256 yearlyRate = Math.mulDiv(percentageChange, 365 days, elapsedTime);
         uint256 yearlyRateInBps = yearlyRate / 1e14;
 
-        if (yearlyRateInBps > type(uint16).max) yearlyRateInBps = type(uint16).max;
-        
-        uint16 yearlyRateInBps16 = uint16(yearlyRateInBps);
+        uint16 yearlyRateInBps16 = uint16(Math.min(yearlyRateInBps, type(uint16).max));
 
         if (exchangeRateGuard) {
             if (yearlyRateInBps16 > acceptablAprInBps) revert ExchangeRatioChangeExceedsThreshold(yearlyRateInBps16);
@@ -108,7 +107,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         if (msg.sender != withdrawManager) revert NotAuthorized();
 
         (bool success,) = payable(withdrawManager).call{value: amount}("");
-        // if (!success) revert ;
+        if (!success) revert FailedToSendToWithdrawManager();
     }
 
     function setWithdrawManager(address _withdrawManager) external {
@@ -165,12 +164,12 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     }
 
     function pauseStaking() external {
-        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_PAUSER(), msg.sender)) revert NotAuthorized();
+        if (msg.sender != address(roleRegistry)) revert NotAuthorized();
         _pause();
     }
 
     function unpauseStaking() external {
-        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_UNPAUSER(), msg.sender)) revert NotAuthorized();
+        if (msg.sender != address(roleRegistry)) revert NotAuthorized();
         _unpause();
     }
 
@@ -186,11 +185,9 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function getTotalProtocolHype() public view returns (uint256) {
         L1Read.DelegatorSummary memory delegatorSummary = l1Read.delegatorSummary(address(this));
-        
         uint256 totalHypeInStakingAccount = _convertTo18Decimals(delegatorSummary.delegated) + _convertTo18Decimals(delegatorSummary.undelegated) + _convertTo18Decimals(delegatorSummary.totalPendingWithdrawal);
 
         L1Read.SpotBalance memory spotBalance = l1Read.spotBalance(address(this), HYPE_TOKEN_ID);
-        
         uint256 totalHypeInSpotAccount = _convertTo18Decimals(spotBalance.total);
 
         uint256 totalHypeInLiquidityPool = address(this).balance;

@@ -21,14 +21,15 @@ interface IStakingCore {
     error FailedToDepositToHyperCore();
     error StakingPaused();
     error ElapsedTimeCannotBeZero();
-    
+    error FailedToSendToWithdrawManager();
+
     /* ========== EVENTS ========== */
 
     /**
      * @notice Emitted when the exchange ratio is updated
      * @param oldRatio The previous exchange ratio
      * @param newRatio The new exchange ratio
-     * @param yearlyRateInBps The yearly rate in bps
+     * @param yearlyRateInBps The absolute yearly rate in bps
      */
     event ExchangeRatioUpdated(uint256 oldRatio, uint256 newRatio, uint16 yearlyRateInBps);
 
@@ -134,13 +135,13 @@ interface IStakingCore {
 
     /**
      * @notice Pauses staking
-     * @dev Only callable by accounts with PROTOCOL_PAUSER role
+     * @dev Only callable by the role registry
      */
     function pauseStaking() external;
     
     /**
      * @notice Unpauses staking
-     * @dev Only callable by accounts with PROTOCOL_UNPAUSER role
+     * @dev Only callable by the role registry
      */
     function unpauseStaking() external;
 

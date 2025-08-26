@@ -52,7 +52,7 @@ contract BaseTest is Test {
         RoleRegistry roleRegistryImpl = new RoleRegistry();
         roleRegistry = RoleRegistry(address(new UUPSProxy(
             address(roleRegistryImpl),
-            abi.encodeWithSelector(RoleRegistry.initialize.selector, admin, protocolTreasury)
+            abi.encodeWithSelector(RoleRegistry.initialize.selector, admin, address(0), address(0), protocolTreasury)
         )));
 
         BeHYPE beHYPEImpl = new BeHYPE();
@@ -102,8 +102,8 @@ contract BaseTest is Test {
         stakingCore.setWithdrawManager(address(withdrawManager));
         roleRegistry.grantRole(roleRegistry.PROTOCOL_ADMIN(), admin);
         roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), admin);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), admin);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_UNPAUSER(), admin);
+        roleRegistry.setWithdrawManager(address(withdrawManager));
+        roleRegistry.setStakingCore(address(stakingCore));
         vm.stopPrank();
 
         vm.deal(user, 10 ether);

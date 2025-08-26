@@ -16,7 +16,7 @@ interface IWithdrawManager {
     
     struct WithdrawalEntry {
         address user;              // Address of the user
-        uint256 beHypeAmount;      // Amount of beHYPE tokens locked
+        uint256 beHypeAmount;      // Amount of beHYPE tokens locked for withdrawal
         uint256 hypeAmount;        // Amount of HYPE to be withdrawn
         bool claimed;              // Whether the withdrawal has been claimed
     }
@@ -26,7 +26,6 @@ interface IWithdrawManager {
     error WithdrawalsPaused();
     error InvalidAmount();
     error InsufficientBeHYPEBalance();
-    error InvalidHYPEAmount();
     error NotAuthorized();
     error IndexOutOfBounds();
     error CanOnlyFinalizeForward();
@@ -122,15 +121,24 @@ interface IWithdrawManager {
      */
     function canInstantWithdraw(uint256 beHypeAmount) external view returns (bool);
     
+    /**
+     * @notice Get a withdrawal entry from the queue
+     * @param index Index of the withdrawal entry
+     * @return WithdrawalEntry The withdrawal entry
+     */
+    function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory);
+    
     /* ========== ADMIN FUNCTIONS ========== */
     
     /**
      * @notice Pause withdrawals
+     * @dev Only callable by the role registry
      */
     function pauseWithdrawals() external;
     
     /**
      * @notice Unpause withdrawals
+     * @dev Only callable by the role registry
      */
     function unpauseWithdrawals() external;
     
