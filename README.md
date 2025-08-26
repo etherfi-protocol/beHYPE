@@ -26,7 +26,7 @@ The WithdrawManager manages instant and standard withdrawals (3 to 7 days) reque
 Core staking contract 
 
 - Provides the exchange rate between beHYPE and HYPE by calculating the total protocol balance:
-  (StakingCore contract balance) + (StakingCore L1 stake account balance) 
+  (StakingCore contract balance) + (StakingCore L1 stake account balance) + (StakingCore L1 spot balance)
 - Admin functions leveraging CoreWriter for staking, unstaking, and rebalancing on the hyperCore
 
 ## Access Control System
