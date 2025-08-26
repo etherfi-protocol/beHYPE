@@ -19,7 +19,7 @@ The WithdrawManager manages instant and standard withdrawals (3 to 7 days) reque
   Exchange rate at time of request determine the HYPE withdrawal amount.
   2. Off-chain service finalizes withdraws. beHYPE tokens are burnt and HYPE is transfer to the user 
 - Allows for instant withdrawals for a fee
-- Availability for instant withdrawals is determined by a minimum liquidity threshold as a percentage of TVL
+- Availability for instant withdrawals is determined by a minimum liquidity threshold as a percentage of TVL and a rate limiter
 
 ### StakingCore
 

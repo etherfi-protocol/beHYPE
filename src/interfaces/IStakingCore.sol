@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.26;
 
 import {IRoleRegistry} from "./IRoleRegistry.sol";
 import {IBeHYPEToken} from "./IBeHype.sol";
@@ -97,6 +97,41 @@ interface IStakingCore {
      */
     function updateExchangeRatio() external;
 
+    /**
+     * @notice Allows the withdraw manager to send HYPE to the user
+     * @param amount The amount of HYPE to send
+     * @param to The address to send the HYPE to
+     * @dev Only callable by the withdraw manager
+     */
+    function sendFromWithdrawManager(uint256 amount, address to) external;
+
+    /**
+     * @notice Sets the withdraw manager
+     * @param _withdrawManager The new withdraw manager
+     * @dev Only callable by the protocol upgrader
+     */
+    function setWithdrawManager(address _withdrawManager) external;
+
+    /**
+     * @notice Updates the acceptable APR
+     * @param _acceptablAprInBps The new acceptable APR
+     * @dev Only callable by the protocol guardian
+     */
+    function updateAcceptableApr(uint16 _acceptablAprInBps) external;
+
+    /**
+     * @notice Updates the exchange rate guard
+     * @param _exchangeRateGuard The new exchange rate guard
+     * @dev Only callable by the protocol guardian
+     */
+    function updateExchangeRateGuard(bool _exchangeRateGuard) external;
+
+    /**
+     * @notice Deposits HYPE to HyperCore staking module from HyperCore spot account
+     * @param amount The amount of HYPE to deposit in wei
+     * @dev Only callable by the protocol admin
+     */
+    function depositToHyperCore(uint256 amount) external;
 
     /**
      * @notice Withdraws HYPE from HyperCore
@@ -137,14 +172,6 @@ interface IStakingCore {
      * @dev Emits TokenDelegated event
      */
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external;
-
-    /**
-     * @notice Allows the withdraw manager to send HYPE to the user
-     * @param amount The amount of HYPE to send
-     * @param to The address to send the HYPE to
-     * @dev Only callable by the withdraw manager
-     */
-    function sendFromWithdrawManager(uint256 amount, address to) external;
 
     /**
      * @notice Pauses staking

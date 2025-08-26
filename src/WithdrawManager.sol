@@ -241,7 +241,6 @@ contract WithdrawManager is
 
     /**
      * @dev The staking core's balance is our liquid hype amount.
-     * Hype is transferred from `StakingCore` to the `WithdrawalManager` when a withdrawal is finalized.
      */
     function getLiquidHypeAmount() public view returns (uint256) {
         return address(stakingCore).balance;
