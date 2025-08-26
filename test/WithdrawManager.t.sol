@@ -40,18 +40,17 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(unclaimedWithdrawals.length, 1);
         assertEq(unclaimedWithdrawals[0], 2);
 
+        uint256 balanceBeforeBeHYPE = beHYPE.balanceOf(address(withdrawManager));
         vm.prank(admin);
         withdrawManager.finalizeWithdrawals(1);
         assertEq(withdrawManager.canClaimWithdrawal(1), true);
         assertEq(withdrawManager.canClaimWithdrawal(2), false);
+        assertEq(beHYPE.balanceOf(address(withdrawManager)), balanceBeforeBeHYPE - 1 ether);
 
         uint256 balanceBefore = address(user).balance;
-        uint256 balanceBeforeBeHYPE = beHYPE.balanceOf(address(withdrawManager));
         vm.prank(user);
         withdrawManager.claimWithdrawal(1);
-
         assertEq(user.balance, balanceBefore + 1 ether);
-        assertEq(beHYPE.balanceOf(address(withdrawManager)), balanceBeforeBeHYPE - 1 ether);
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotFinalized.selector));
@@ -60,6 +59,35 @@ contract WithdrawManagerTest is BaseTest {
         vm.prank(user2);
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotFinalized.selector));
         withdrawManager.claimWithdrawal(2);
+    }
+
+    function test_withdraw_with_exchange_rate() public {
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+
+        assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
+
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 20 ether);
+        withdrawManager.withdraw(5 ether, false);
+        withdrawManager.withdraw(5 ether, false);
+        withdrawManager.withdraw(5 ether, false);
+        withdrawManager.withdraw(5 ether, false);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        withdrawManager.finalizeWithdrawals(2);
+
+        assertEq(stakingCore.getTotalProtocolHype(), 90 ether);
+
+        // update exchange rate to 1 BeHYPE = 2 HYPE
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 90 ether, 0, 0);
+        vm.warp(block.timestamp + (365 days * 100));
+        vm.prank(admin);
+        stakingCore.updateExchangeRatio();
+        assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
+
     }
 
     /* ========== INSTANT WITHDRAWAL TESTS ========== */
@@ -140,14 +168,12 @@ contract WithdrawManagerTest is BaseTest {
     }
 
     function test_multipleUsersMultipleWithdrawals() public {
-        // Setup 4 users with different initial balances
         address user3 = makeAddr("user3");
         address user4 = makeAddr("user4");
         
         vm.deal(user3, 50 ether);
         vm.deal(user4, 75 ether);
         
-        // User stakes different amounts
         vm.prank(user3);
         stakingCore.stake{value: 25 ether}("");
         

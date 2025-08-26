@@ -159,8 +159,10 @@ contract WithdrawManager is
         if (index < lastFinalizedIndex) revert CanOnlyFinalizeForward();
 
         uint256 hypeAmountToFinalize = 0;
+        uint256 beHypeAmountToFinalize = 0;
         for (uint256 i = lastFinalizedIndex + 1; i <= index;) {
             hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
+            beHypeAmountToFinalize += withdrawalQueue[i].beHypeAmount;
 
             unchecked { ++i; }
         }
@@ -172,6 +174,7 @@ contract WithdrawManager is
         lastFinalizedIndex = index;
 
         stakingCore.sendToWithdrawManager(hypeAmountToFinalize);
+        beHypeToken.burn(address(this), beHypeAmountToFinalize);
 
         emit WithdrawalsBatchFinalized(index);
     }
@@ -279,8 +282,6 @@ contract WithdrawManager is
         uint256 beHypeAmount = entry.beHypeAmount;
         
         entry.claimed = true;
-
-        beHypeToken.burn(address(this), beHypeAmount);
         
         (bool success, ) = payable(entry.user).call{value: hypeAmount}("");
         if (!success) revert TransferFailed();
