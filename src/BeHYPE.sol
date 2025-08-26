@@ -25,7 +25,7 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         address _roleRegistry,
         address _stakingCore,
         address _withdrawManager) public initializer {
-
+        __UUPSUpgradeable_init();
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
 

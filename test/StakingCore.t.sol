@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./Base.t.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract StakingCoreTest is BaseTest {
 
@@ -103,6 +104,18 @@ contract StakingCoreTest is BaseTest {
         stakingCore.upgradeToAndCall(address(newStakingCoreImpl), "");
 
         assertEq(stakingCore.exchangeRatio(), 1 ether);
+    }
+
+    function test_RevertReinitialization() public {
+        vm.prank(admin);
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        stakingCore.initialize(
+            address(roleRegistry),
+            address(beHYPE),
+            address(withdrawManager),
+            400,
+            true
+        );
     }
 
 }

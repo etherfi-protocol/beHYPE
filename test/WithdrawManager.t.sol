@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./Base.t.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract WithdrawManagerTest is BaseTest {
 
@@ -353,6 +354,22 @@ contract WithdrawManagerTest is BaseTest {
         withdrawManager.upgradeToAndCall(address(newWithdrawManagerImpl), "");
 
         assertEq(withdrawManager.getPendingWithdrawalsCount(), 0);
+    }
+
+    function test_RevertReinitialization() public {
+        vm.prank(admin);
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        withdrawManager.initialize(
+            0.1 ether,
+            100 ether,
+            100,
+            30,
+            address(roleRegistry), 
+            address(beHYPE),
+            address(stakingCore),
+            10 ether,
+            1 days
+        );
     }
 
 }

@@ -5,6 +5,7 @@ import "./Base.t.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {IBeHYPEToken} from "../src/interfaces/IBeHype.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract BeHYPETest is BaseTest {
     using ECDSA for bytes32;
@@ -192,4 +193,17 @@ contract BeHYPETest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.OnlyProtocolUpgrader.selector));
         beHYPE.upgradeToAndCall(address(newBeHYPEImpl), "");
     }
+
+    function test_RevertReinitialization() public {
+        vm.prank(admin);
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        beHYPE.initialize(
+            "BeHYPE Token",
+            "BeHYPE",
+            address(roleRegistry),
+            address(stakingCore),
+            address(withdrawManager)
+        );
+    }
+
 }

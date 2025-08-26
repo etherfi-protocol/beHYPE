@@ -9,6 +9,7 @@ import {IRoleRegistry} from "../src/interfaces/IRoleRegistry.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract RoleRegistryTest is BaseTest {
     address public guardian = makeAddr("guardian");
@@ -139,6 +140,17 @@ contract RoleRegistryTest is BaseTest {
         roleRegistry.upgradeToAndCall(address(newRoleRegistryImpl), "");
 
         assertEq(roleRegistry.protocolTreasury(), protocolTreasury);
+    }
+
+    function test_RevertReinitialization() public {
+        vm.prank(admin);
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        roleRegistry.initialize(
+            admin,
+            address(withdrawManager),
+            address(stakingCore),
+            protocolTreasury
+        );
     }
 
     function test_TwoStepOwnershipTransfer() public {
