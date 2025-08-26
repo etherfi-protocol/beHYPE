@@ -207,12 +207,13 @@ contract WithdrawManager is
     function getUserUnFinalizedWithdrawals(address user) external view returns (uint256[] memory) {
         uint256[] memory unFinalizedWithdrawals = new uint256[](userWithdrawals[user].length);
         uint256 count = 0;
-        for (uint256 i = 0; i < userWithdrawals[user].length; i++) {
+        for (uint256 i = 0; i < userWithdrawals[user].length;) {
             WithdrawalEntry storage entry = withdrawalQueue[userWithdrawals[user][i]];
             if (!entry.finalized) {
                 unFinalizedWithdrawals[count] = userWithdrawals[user][i];
-                count++;
+                unchecked { ++count; }
             }
+            unchecked { ++i; }
         }
 
         assembly {
