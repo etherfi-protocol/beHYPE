@@ -136,11 +136,11 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit HyperCoreDeposit(amount);
     }
 
-    function withdrawFromHyperCore(uint amount) external {
+    function withdrawFromHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
-        _encodeAction(6, abi.encode(address(this), HYPE_TOKEN_ID, amount));
+        _encodeAction(6, abi.encode(L1_HYPE_CONTRACT, HYPE_TOKEN_ID, _convertTo8Decimals(amount)));
         emit HyperCoreWithdraw(amount);
     }
 
@@ -238,7 +238,5 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         roleRegistry.onlyProtocolUpgrader(msg.sender);
     }
 
-    receive() external payable {
-        stake("");
-    }
+    receive() external payable {}
 }
