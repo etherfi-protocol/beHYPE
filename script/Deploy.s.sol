@@ -9,118 +9,32 @@ import {StakingCore} from "../src/StakingCore.sol";
 import {CoreWriter} from "../src/lib/CoreWriter.sol";
 import {WithdrawManager} from "../src/WithdrawManager.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
+import {console} from "forge-std/console.sol";
 
 contract DeployScript is Script {
-    // Contract instances
-    BeHYPE public beHYPE;
-    RoleRegistry public roleRegistry;
-    WithdrawManager public withdrawManager;
-    StakingCore public stakingCore;
-    
-    // Mock contracts for testing
-    L1Read public l1Read;
-    CoreWriter public coreWriter;
+    BeHYPE public constant beHYPE = BeHYPE(0xB015cDde8EDd0f0eF64bEF865342B32204500414);
+    RoleRegistry public constant roleRegistry = RoleRegistry(payable(0x220200441F071aefCB7444fe773a0138db429ED6));
+    WithdrawManager public constant withdrawManager = WithdrawManager(payable(0x6ad9B82B7654F25df2BB7DfCED7632db179a1825));
+    StakingCore public constant stakingCore = StakingCore(payable(0x9B45579fD53e964175d259640C1EE1d219BD2D20));
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
-        console.log("Deploying BeHYPE Protocol...");
-        console.log("Deployer address:", deployer);
-        
         vm.startBroadcast(deployerPrivateKey);
-        
-        console.log("Deploying mock contracts...");
-        l1Read = new L1Read();
-        coreWriter = new CoreWriter();
-        
-        console.log("Deploying RoleRegistry...");
-        RoleRegistry roleRegistryImpl = new RoleRegistry();
-        roleRegistry = RoleRegistry(address(new UUPSProxy(
-            address(roleRegistryImpl),
-            abi.encodeWithSelector(
-                RoleRegistry.initialize.selector,
-                deployer,
-                address(0),
-                address(0),
-                deployer
-            )
-        )));
-        console.log("RoleRegistry deployed at:", address(roleRegistry));
-        
-        console.log("Deploying BeHYPE...");
-        BeHYPE beHYPEImpl = new BeHYPE();
-        beHYPE = BeHYPE(address(new UUPSProxy(
-            address(beHYPEImpl),
-            abi.encodeWithSelector(
-                BeHYPE.initialize.selector,
-                "BeHYPE Token",
-                "BeHYPE",
-                address(roleRegistry),
-                address(0)
-            )
-        )));
-        console.log("BeHYPE deployed at:", address(beHYPE));
-        
-        console.log("Deploying WithdrawManager...");
-        WithdrawManager withdrawManagerImpl = new WithdrawManager();
-        withdrawManager = WithdrawManager(payable(address(new UUPSProxy(
-            address(withdrawManagerImpl),
-            abi.encodeWithSelector(
-                WithdrawManager.initialize.selector,
-                0.1 ether,
-                100 ether,
-                100,
-                30,
-                address(roleRegistry),
-                address(beHYPE),
-                address(0),
-                10 ether,
-                1 days
-            )
-        )));
-        console.log("WithdrawManager deployed at:", address(withdrawManager));
-        
-        console.log("Deploying StakingCore...");
-        StakingCore stakingCoreImpl = new StakingCore();
-        stakingCore = StakingCore(payable(address(new UUPSProxy(
-            address(stakingCoreImpl),
-            abi.encodeWithSelector(
-                StakingCore.initialize.selector,
-                address(roleRegistry),
-                address(beHYPE),
-                address(withdrawManager),
-                400, 
-                true           
-            )
-        )));
-        console.log("StakingCore deployed at:", address(stakingCore));
-        
-        console.log("Configuring contract relationships and roles...");
 
-        beHYPE.setStakingCore(address(stakingCore));
+        // stakingCore.depositToHyperCore(0.0001 ether);
+
+        stakingCore.delegateTokens(0xdF35aee8ef5658686142ACd1E5AB5DBcDF8c51e8, 0.00000001 ether, true);
+
+        // stakingCore.updateExchangeRatio();
+
+        // stakingCore.updateExchangeRateGuard(false);
+
         
-        beHYPE.setWithdrawManager(address(withdrawManager));
-        
-        stakingCore.setWithdrawManager(address(withdrawManager));
-        
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_ADMIN(), deployer);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), deployer);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_OPERATOR(), deployer);
-        
-        roleRegistry.setWithdrawManager(address(withdrawManager));
-        roleRegistry.setStakingCore(address(stakingCore));
-        
+
+
+
         vm.stopBroadcast();
-        
-        console.log("\n=== Deployment Summary ===");
-        console.log("RoleRegistry:", address(roleRegistry));
-        console.log("BeHYPE:", address(beHYPE));
-        console.log("WithdrawManager:", address(withdrawManager));
-        console.log("StakingCore:", address(stakingCore));
-        console.log("L1Read (mock):", address(l1Read));
-        console.log("CoreWriter (mock):", address(coreWriter));
-        console.log("All roles assigned to deployer:", deployer);
-        console.log("Deployment completed successfully!");
     }
 }
