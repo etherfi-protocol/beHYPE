@@ -18,7 +18,7 @@ interface IWithdrawManager {
         address user;              // Address of the user
         uint256 beHypeAmount;      // Amount of beHYPE tokens locked for withdrawal
         uint256 hypeAmount;        // Amount of HYPE to be withdrawn
-        bool finalized;            // Whether the withdrawal has been finalized
+        bool claimed;            // Whether the withdrawal has been claimed
     }
 
     /* ========== ERRORS ========== */
@@ -29,13 +29,14 @@ interface IWithdrawManager {
     error NotAuthorized();
     error IndexOutOfBounds();
     error CanOnlyFinalizeForward();
-    error WithdrawalNotFinalized();
+    error WithdrawalNotClaimable();
     error InvalidWithdrawalID();
     error TransferFailed();
     error WithdrawalsNotPaused();
     error InsufficientHYPELiquidity();
     error InstantWithdrawalRateLimitExceeded();
     error InvalidInstantWithdrawalFee();
+    error AlreadyClaimed();
 
     /* ========== EVENTS ========== */
     
@@ -48,6 +49,12 @@ interface IWithdrawManager {
     );
     
     event WithdrawalsBatchFinalized(uint256 upToIndex);
+
+    event WithdrawalClaimed(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 hypeAmount
+    );
     
     event InstantWithdrawal(
         address indexed user,
@@ -95,6 +102,13 @@ interface IWithdrawManager {
      * @return WithdrawalEntry The withdrawal entry
      */
     function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory);
+
+    /**
+     * @notice Check if a withdrawal can be claimed
+     * @param withdrawalId The ID of the withdrawal
+     * @return bool True if the withdrawal can be claimed
+     */
+    function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool);
 
     /**
      * @notice Get the amount of hype requested for withdrawal
