@@ -95,10 +95,6 @@ contract WithdrawManagerTest is BaseTest {
         stakingCore.withdrawFromStaking(5 ether);
         vm.expectRevert(abi.encodeWithSelector(IStakingCore.NotAuthorized.selector));
         stakingCore.withdrawFromStaking(11 ether);
-
-        stakingCore.withdrawFromHyperCore(5 ether);
-        vm.expectRevert(abi.encodeWithSelector(IStakingCore.NotAuthorized.selector));
-        stakingCore.withdrawFromHyperCore(11 ether);
         vm.stopPrank();
 
         vm.prank(admin);

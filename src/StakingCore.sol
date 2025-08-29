@@ -45,7 +45,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         address _beHype,
         address _withdrawManager,
         uint32 _acceptablAprInBps,
-        bool _exchangeRateGuard
+        bool _exchangeRateGuard,
+        uint256 _withdrawalCooldownPeriod
     ) public initializer {
         __UUPSUpgradeable_init();
 
@@ -57,8 +58,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
-        withdrawalCooldownPeriod = 12 hours; // Default 12 hours
-        lastWithdrawalTimestamp = 0;
+        withdrawalCooldownPeriod = _withdrawalCooldownPeriod;
+        lastWithdrawalTimestamp = block.timestamp ;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
@@ -165,9 +166,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
-        // Check if enough time has passed since the last withdrawal
-        // If lastWithdrawalTimestamp is 0, it means no withdrawals have been made yet
-        if (lastWithdrawalTimestamp != 0 && block.timestamp < lastWithdrawalTimestamp + withdrawalCooldownPeriod) {
+        if (block.timestamp < lastWithdrawalTimestamp + withdrawalCooldownPeriod) {
             revert WithdrawalCooldownNotMet();
         }
         
