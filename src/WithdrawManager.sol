@@ -106,8 +106,6 @@ contract WithdrawManager is
             if (!_canRateLimiterConsume(hypeAmount)) revert InstantWithdrawalRateLimitExceeded();
             if (!canInstantWithdraw(beHypeAmount)) revert InsufficientHYPELiquidity();
 
-
-
             uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
             uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
             uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
@@ -127,16 +125,15 @@ contract WithdrawManager is
             withdrawalId = withdrawalQueue.length;
             hypeRequestedForWithdraw += hypeAmount;
         
-            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
-        
             withdrawalQueue.push(WithdrawalEntry({
                 user: msg.sender,
                 beHypeAmount: beHypeAmount,
                 hypeAmount: hypeAmount,
                 finalized: false
             }));
-        
             userWithdrawals[msg.sender].push(withdrawalId);
+
+            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
                 
             emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount, withdrawalId);
         }
