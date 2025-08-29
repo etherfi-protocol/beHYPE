@@ -142,7 +142,6 @@ contract WithdrawManager is
     function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
         if (paused()) revert WithdrawalsPaused();
         if (!canClaimWithdrawal(withdrawalId)) revert WithdrawalNotClaimable();
-        if (withdrawalId >= withdrawalQueue.length) revert InvalidWithdrawalID();
         WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
         if (entry.claimed) revert AlreadyClaimed();
         

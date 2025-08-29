@@ -69,6 +69,10 @@ contract WithdrawManagerTest is BaseTest {
         vm.prank(user2);
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotClaimable.selector));
         withdrawManager.claimWithdrawal(2);
+
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotClaimable.selector));
+        withdrawManager.claimWithdrawal(10);
     }
 
     function test_withdraw_with_exchange_rate() public {
