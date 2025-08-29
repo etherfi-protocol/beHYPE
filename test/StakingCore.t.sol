@@ -120,12 +120,11 @@ contract StakingCoreTest is BaseTest {
     
     function test_depositToHyperCore_should_revert_with_various_precision_loss_scenarios() public {
         test_stake();
-
-        // Test various amounts that would cause precision loss
+        
         uint256[] memory problematicAmounts = new uint256[](3);
-        problematicAmounts[0] = 1 ether + 1;                    // 1 ether + 1 wei
-        problematicAmounts[1] = 1 ether + 1000;                  // 1 ether + 1000 wei  
-        problematicAmounts[2] = 1 ether + 1e9;                   // 1 ether + 0.000000001 ether
+        problematicAmounts[0] = 1 ether + 1;
+        problematicAmounts[1] = 1 ether + 1000;
+        problematicAmounts[2] = 1 ether + 1e9;
 
         for (uint256 i = 0; i < problematicAmounts.length; i++) {
             uint256 amount = problematicAmounts[i];
