@@ -118,4 +118,59 @@ contract StakingCoreTest is BaseTest {
         );
     }
 
+    function testWithdrawFromStakingCooldown() public {
+        // Setup: user stakes HYPE to create a withdrawal scenario
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+        
+        // User creates withdrawal requests - create more than we need for testing
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 50 ether);
+        withdrawManager.withdraw(20 ether, false);
+        vm.stopPrank();
+        
+        // Verify that there are pending withdrawals
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);
+        
+        // Use admin address that already has PROTOCOL_ADMIN role
+        vm.prank(admin);
+        
+        // First withdrawal should succeed (no previous withdrawals, so no cooldown)
+        stakingCore.withdrawFromStaking(10 ether);
+        
+        // Second withdrawal immediately after should fail due to cooldown
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.WithdrawalCooldownNotMet.selector);
+        stakingCore.withdrawFromStaking(5 ether);
+        
+        // Wait for half the cooldown period from the last withdrawal timestamp
+        uint256 lastWithdrawalTime = stakingCore.lastWithdrawalTimestamp();
+        vm.warp(lastWithdrawalTime + 6 hours);
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.WithdrawalCooldownNotMet.selector);
+        stakingCore.withdrawFromStaking(5 ether);
+        
+        // Wait for full cooldown period from the last withdrawal timestamp
+        vm.warp(lastWithdrawalTime + 12 hours);
+        vm.prank(admin);
+        stakingCore.withdrawFromStaking(5 ether); // Should succeed now
+    }
+
+    function testUpdateWithdrawalCooldownPeriod() public {
+        // Use admin address that already has PROTOCOL_GUARDIAN role
+        vm.prank(admin);
+        
+        uint256 newCooldown = 24 hours;
+        stakingCore.updateWithdrawalCooldownPeriod(newCooldown);
+        
+        assertEq(stakingCore.withdrawalCooldownPeriod(), newCooldown);
+    }
+
+    function testUpdateWithdrawalCooldownPeriodNotAuthorized() public {
+        // Should fail without guardian role
+        vm.expectRevert(IStakingCore.NotAuthorized.selector);
+        stakingCore.updateWithdrawalCooldownPeriod(24 hours);
+    }
+
 }

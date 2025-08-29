@@ -22,6 +22,7 @@ interface IStakingCore {
     error StakingPaused();
     error ElapsedTimeCannotBeZero();
     error FailedToSendFromWithdrawManager();
+    error WithdrawalCooldownNotMet();
 
     /* ========== EVENTS ========== */
 
@@ -79,6 +80,12 @@ interface IStakingCore {
      */
     event WithdrawManagerUpdated(address withdrawManager);
 
+    /**
+     * @notice Emitted when the withdrawal cooldown period is updated
+     * @param withdrawalCooldownPeriod The new withdrawal cooldown period in seconds
+     */
+    event WithdrawalCooldownPeriodUpdated(uint256 withdrawalCooldownPeriod);
+
     /* ========== MAIN FUNCTIONS ========== */
 
     /**
@@ -125,6 +132,13 @@ interface IStakingCore {
      * @dev Only callable by the protocol guardian
      */
     function updateExchangeRateGuard(bool _exchangeRateGuard) external;
+
+    /**
+     * @notice Updates the withdrawal cooldown period
+     * @param _withdrawalCooldownPeriod The new cooldown period in seconds
+     * @dev Only callable by the protocol guardian
+     */
+    function updateWithdrawalCooldownPeriod(uint256 _withdrawalCooldownPeriod) external;
 
     /**
      * @notice Deposits HYPE to HyperCore staking module from HyperCore spot account

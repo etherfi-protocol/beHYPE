@@ -25,6 +25,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     uint32 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
+    uint256 public withdrawalCooldownPeriod;
+    uint256 public lastWithdrawalTimestamp;
 
     /* ========== CONSTANTS ========== */
 
@@ -55,6 +57,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
+        withdrawalCooldownPeriod = 12 hours; // Default 12 hours
+        lastWithdrawalTimestamp = 0;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
@@ -128,6 +132,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         exchangeRateGuard = _exchangeRateGuard;
     }
 
+    function updateWithdrawalCooldownPeriod(uint256 _withdrawalCooldownPeriod) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        withdrawalCooldownPeriod = _withdrawalCooldownPeriod;
+        
+        emit WithdrawalCooldownPeriodUpdated(withdrawalCooldownPeriod);
+    }
+
     function depositToHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
 
@@ -138,7 +149,6 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
         _encodeAction(6, abi.encode(L1_HYPE_CONTRACT, HYPE_TOKEN_ID, _convertTo8Decimals(amount)));
         emit HyperCoreWithdraw(amount);
@@ -155,7 +165,14 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
+        // Check if enough time has passed since the last withdrawal
+        // If lastWithdrawalTimestamp is 0, it means no withdrawals have been made yet
+        if (lastWithdrawalTimestamp != 0 && block.timestamp < lastWithdrawalTimestamp + withdrawalCooldownPeriod) {
+            revert WithdrawalCooldownNotMet();
+        }
+        
         _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
+        lastWithdrawalTimestamp = block.timestamp;
         emit HyperCoreStakingWithdraw(amount);
     }
 
@@ -178,8 +195,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     /* ========== VIEW FUNCTIONS ========== */
 
-    function BeHYPEToHYPE(uint256 kHYPEAmount) public view returns (uint256) {
-        return Math.mulDiv(kHYPEAmount, exchangeRatio, 1e18);
+    function BeHYPEToHYPE(uint256 beHYPEAmount) public view returns (uint256) {
+        return Math.mulDiv(beHYPEAmount, exchangeRatio, 1e18);
     }
 
     function HYPEToBeHYPE(uint256 HYPEAmount) public view returns (uint256) {
