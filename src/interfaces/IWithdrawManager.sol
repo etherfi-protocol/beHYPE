@@ -57,32 +57,6 @@ interface IWithdrawManager {
     );
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
-    
-    /* ========== INITIALIZATION ========== */
-    
-    /**
-     * @notice Initialize the WithdrawManager contract
-     * @param _minWithdrawAmount Minimum withdrawal amount
-     * @param _maxWithdrawAmount Maximum withdrawal amount
-     * @param _lowWatermarkInBpsOfTvl Low watermark in basis points of TVL
-     * @param _instantWithdrawalFeeInBps Instant withdrawal fee in basis points
-     * @param _roleRegistry Address of the role registry
-     * @param _beHypeToken Address of the beHYPE token
-     * @param _stakingCore Address of the staking core
-     * @param _bucketCapacity Bucket capacity for rate limiting
-     * @param _bucketRefillRate Bucket refill rate for rate limiting
-     */
-    function initialize(
-        uint256 _minWithdrawAmount,
-        uint256 _maxWithdrawAmount,
-        uint16 _lowWatermarkInBpsOfTvl,
-        uint16 _instantWithdrawalFeeInBps,
-        address _roleRegistry,
-        address _beHypeToken,
-        address _stakingCore,
-        uint256 _bucketCapacity,
-        uint64 _bucketRefillRate
-    ) external;
 
     /* ========== MAIN FUNCTIONS ========== */
     
