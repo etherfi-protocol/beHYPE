@@ -58,15 +58,41 @@ interface IWithdrawManager {
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
     
+    /* ========== INITIALIZATION ========== */
+    
+    /**
+     * @notice Initialize the WithdrawManager contract
+     * @param _minWithdrawAmount Minimum withdrawal amount
+     * @param _maxWithdrawAmount Maximum withdrawal amount
+     * @param _lowWatermarkInBpsOfTvl Low watermark in basis points of TVL
+     * @param _instantWithdrawalFeeInBps Instant withdrawal fee in basis points
+     * @param _roleRegistry Address of the role registry
+     * @param _beHypeToken Address of the beHYPE token
+     * @param _stakingCore Address of the staking core
+     * @param _bucketCapacity Bucket capacity for rate limiting
+     * @param _bucketRefillRate Bucket refill rate for rate limiting
+     */
+    function initialize(
+        uint256 _minWithdrawAmount,
+        uint256 _maxWithdrawAmount,
+        uint16 _lowWatermarkInBpsOfTvl,
+        uint16 _instantWithdrawalFeeInBps,
+        address _roleRegistry,
+        address _beHypeToken,
+        address _stakingCore,
+        uint256 _bucketCapacity,
+        uint64 _bucketRefillRate
+    ) external;
+
     /* ========== MAIN FUNCTIONS ========== */
     
     /**
      * @notice Queue a withdrawal request
-     * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @param beHYPEAmount Amount of beHYPE tokens to withdraw
      * @param instant Whether to withdraw instantly for a fee or queue
      * @return withdrawalId The ID of the withdrawal request
      */
-    function withdraw(uint256 beHypeAmount, bool instant) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHYPEAmount, bool instant) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
@@ -84,10 +110,10 @@ interface IWithdrawManager {
     
     /**
      * @notice Check if a withdrawal amount can be instant withdrawn
-     * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @param beHYPEAmount Amount of beHYPE tokens to withdraw
      * @return bool True if the withdrawal can be instant withdrawn
      */
-    function canInstantWithdraw(uint256 beHypeAmount) external view returns (bool);
+    function canInstantWithdraw(uint256 beHYPEAmount) external view returns (bool);
     
     /**
      * @notice Get a withdrawal entry from the queue
