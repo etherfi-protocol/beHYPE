@@ -130,6 +130,10 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function depositToHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+        uint256 truncatedAmount = amount / 1e10 * 1e10;
+        if (amount != truncatedAmount) {
+            revert PrecisionLossDetected(amount, truncatedAmount);
+        }
 
         (bool success,) = payable(L1_HYPE_CONTRACT).call{value: amount}("");
         if (!success) revert FailedToDepositToHyperCore();
