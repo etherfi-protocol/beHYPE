@@ -59,7 +59,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
         withdrawalCooldownPeriod = _withdrawalCooldownPeriod;
-        lastWithdrawalTimestamp = block.timestamp ;
+        lastWithdrawalTimestamp = block.timestamp;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
