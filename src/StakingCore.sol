@@ -194,10 +194,10 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     /* ========== VIEW FUNCTIONS ========== */
 
-    function BeHYPEToHYPE(uint256 beHYPEAmount) public view returns (uint256) {
-        return Math.mulDiv(beHYPEAmount, exchangeRatio, 1e18);
+    function BeHYPEToHYPE(uint256 kHYPEAmount) public view returns (uint256) {
+        return Math.mulDiv(kHYPEAmount, exchangeRatio, 1e18);
     }
-
+    
     function HYPEToBeHYPE(uint256 HYPEAmount) public view returns (uint256) {
         return Math.mulDiv(HYPEAmount, 1e18, exchangeRatio);
     }
