@@ -93,7 +93,7 @@ contract WithdrawManagerTest is BaseTest {
         // test core writer withdrawal guard (no effect on state)
         vm.startPrank(admin);
         stakingCore.withdrawFromStaking(5 ether);
-        vm.expectRevert(abi.encodeWithSelector(IStakingCore.NotAuthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(IStakingCore.ExceedsLimit.selector));
         stakingCore.withdrawFromStaking(11 ether);
         vm.stopPrank();
 

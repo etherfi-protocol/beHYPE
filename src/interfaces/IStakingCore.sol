@@ -23,7 +23,8 @@ interface IStakingCore {
     error ElapsedTimeCannotBeZero();
     error FailedToSendFromWithdrawManager();
     error WithdrawalCooldownNotMet();
-
+    error ExceedsLimit();
+    
     /* ========== EVENTS ========== */
 
     /**

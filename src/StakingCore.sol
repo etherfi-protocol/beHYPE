@@ -164,7 +164,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromStaking(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
+        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert ExceedsLimit();
         
         if (block.timestamp < lastWithdrawalTimestamp + withdrawalCooldownPeriod) {
             revert WithdrawalCooldownNotMet();
