@@ -81,7 +81,8 @@ contract BaseTest is Test {
                 address(beHYPE),
                 address(withdrawManager),
                 400,
-                true
+                true,
+                12 hours
             )
         ))));
 

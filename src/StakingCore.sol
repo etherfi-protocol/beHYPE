@@ -25,6 +25,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     uint16 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
+    uint256 public withdrawalCooldownPeriod;
+    uint256 public lastWithdrawalTimestamp;
     uint256 public lastHyperCoreOperationBlock;
 
     /* ========== CONSTANTS ========== */
@@ -45,7 +47,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         address _beHype,
         address _withdrawManager,
         uint16 _acceptablAprInBps,
-        bool _exchangeRateGuard
+        bool _exchangeRateGuard,
+        uint256 _withdrawalCooldownPeriod
     ) public initializer {
         __UUPSUpgradeable_init();
 
@@ -57,6 +60,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
+        withdrawalCooldownPeriod = _withdrawalCooldownPeriod;
+        lastWithdrawalTimestamp = block.timestamp;
         lastHyperCoreOperationBlock = block.number;
     }
 
@@ -138,6 +143,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit ExchangeRateGuardUpdated(_exchangeRateGuard);
     }
 
+    function updateWithdrawalCooldownPeriod(uint256 _withdrawalCooldownPeriod) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        withdrawalCooldownPeriod = _withdrawalCooldownPeriod;
+        
+        emit WithdrawalCooldownPeriodUpdated(withdrawalCooldownPeriod);
+    }
+
     function depositToHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         uint256 truncatedAmount = amount / 1e10 * 1e10;
@@ -154,7 +166,6 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromHyperCore(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
         
         _encodeAction(6, abi.encode(L1_HYPE_CONTRACT, HYPE_TOKEN_ID, _convertTo8Decimals(amount)));
         emit HyperCoreWithdraw(amount);
@@ -169,9 +180,14 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function withdrawFromStaking(uint256 amount) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert NotAuthorized();
+        if (amount > IWithdrawManager(withdrawManager).hypeRequestedForWithdraw()) revert ExceedsLimit();
+        
+        if (block.timestamp < lastWithdrawalTimestamp + withdrawalCooldownPeriod) {
+            revert WithdrawalCooldownNotMet();
+        }
         
         _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
+        lastWithdrawalTimestamp = block.timestamp;
         emit HyperCoreStakingWithdraw(amount);
     }
 
@@ -197,7 +213,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function BeHYPEToHYPE(uint256 beHYPEAmount) public view returns (uint256) {
         return Math.mulDiv(beHYPEAmount, exchangeRatio, 1e18);
     }
-
+    
     function HYPEToBeHYPE(uint256 HYPEAmount) public view returns (uint256) {
         return Math.mulDiv(HYPEAmount, 1e18, exchangeRatio);
     }

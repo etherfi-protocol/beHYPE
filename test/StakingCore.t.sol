@@ -116,7 +116,8 @@ contract StakingCoreTest is BaseTest {
             address(beHYPE),
             address(withdrawManager),
             400,
-            true
+            true,
+            12 hours
         );
     }
     
@@ -165,6 +166,39 @@ contract StakingCoreTest is BaseTest {
 
         vm.roll(block.number + 5);
         stakingCore.updateExchangeRatio();
+    }
+
+    function test_WithdrawFromStakingCooldown() public {
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+
+        vm.warp(block.timestamp + 12 hours);
+        
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 50 ether);
+        withdrawManager.withdraw(20 ether, false);
+        vm.stopPrank();
+        
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);
+        
+        vm.prank(admin);
+        
+        stakingCore.withdrawFromStaking(10 ether);
+        
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.WithdrawalCooldownNotMet.selector);
+        stakingCore.withdrawFromStaking(5 ether);
+        
+        uint256 lastWithdrawalTime = stakingCore.lastWithdrawalTimestamp();
+        vm.warp(lastWithdrawalTime + 6 hours);
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.WithdrawalCooldownNotMet.selector);
+        stakingCore.withdrawFromStaking(5 ether);
+        
+        vm.warp(lastWithdrawalTime + 12 hours);
+        vm.prank(admin);
+        stakingCore.withdrawFromStaking(5 ether);
     }
 
 }
