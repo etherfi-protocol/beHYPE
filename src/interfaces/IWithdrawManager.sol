@@ -58,6 +58,10 @@ interface IWithdrawManager {
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
     
+    event InstantWithdrawalCapacityUpdated(uint256 capacity);
+    
+    event InstantWithdrawalRefillRateUpdated(uint64 refillRate);
+    
     /* ========== MAIN FUNCTIONS ========== */
     
     /**
@@ -115,5 +119,26 @@ interface IWithdrawManager {
      * @dev Only callable by the role registry
      */
     function unpauseWithdrawals() external;
+    
+    /**
+     * @notice Set the instant withdrawal fee in basis points
+     * @param _instantWithdrawalFeeInBps The new instant withdrawal fee in basis points
+     * @dev Only callable by the protocol guardian
+     */
+    function setInstantWithdrawalFeeInBps(uint16 _instantWithdrawalFeeInBps) external;
+    
+    /**
+     * @notice Set the instant withdrawal capacity
+     * @param capacity The new instant withdrawal capacity
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalCapacity(uint256 capacity) external;
+    
+    /**
+     * @notice Set the instant withdrawal refill rate per second
+     * @param refillRate The new instant withdrawal refill rate per second
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external;
     
 }

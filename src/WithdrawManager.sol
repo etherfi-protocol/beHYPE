@@ -180,11 +180,13 @@ contract WithdrawManager is
         // max capacity = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE, which is practically enough
         uint64 bucketUnit = _convertToBucketUnit(capacity, Math.Rounding.Floor);
         BucketLimiter.setCapacity(instantWithdrawalLimit, bucketUnit);
+        emit InstantWithdrawalCapacityUpdated(capacity);
     }
 
     function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         BucketLimiter.setRefillRate(instantWithdrawalLimit, refillRate);
+        emit InstantWithdrawalRefillRateUpdated(refillRate);
     }
 
     function pauseWithdrawals() external {

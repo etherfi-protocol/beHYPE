@@ -80,6 +80,18 @@ interface IStakingCore {
      */
     event WithdrawManagerUpdated(address withdrawManager);
 
+    /**
+     * @notice Emitted when the acceptable APR is updated
+     * @param newAprInBps The new acceptable APR in basis points
+     */
+    event AcceptableAprUpdated(uint16 newAprInBps);
+
+    /**
+     * @notice Emitted when the exchange rate guard is updated
+     * @param newExchangeRateGuard The new exchange rate guard value
+     */
+    event ExchangeRateGuardUpdated(bool newExchangeRateGuard);
+
     /* ========== MAIN FUNCTIONS ========== */
 
     /**

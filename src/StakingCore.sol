@@ -22,7 +22,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     IBeHYPEToken public beHypeToken;
     address public withdrawManager;
     uint256 public exchangeRatio;
-    uint32 public acceptablAprInBps;
+    uint16 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
     uint256 public lastHyperCoreOperationBlock;
@@ -44,7 +44,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         address _roleRegistry,
         address _beHype,
         address _withdrawManager,
-        uint32 _acceptablAprInBps,
+        uint16 _acceptablAprInBps,
         bool _exchangeRateGuard
     ) public initializer {
         __UUPSUpgradeable_init();
@@ -129,11 +129,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function updateAcceptableApr(uint16 _acceptablAprInBps) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
         acceptablAprInBps = _acceptablAprInBps;
+        emit AcceptableAprUpdated(_acceptablAprInBps);
     }
 
     function updateExchangeRateGuard(bool _exchangeRateGuard) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
         exchangeRateGuard = _exchangeRateGuard;
+        emit ExchangeRateGuardUpdated(_exchangeRateGuard);
     }
 
     function depositToHyperCore(uint256 amount) external {
