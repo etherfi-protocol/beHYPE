@@ -37,6 +37,7 @@ interface IWithdrawManager {
     error InstantWithdrawalRateLimitExceeded();
     error InvalidInstantWithdrawalFee();
     error AlreadyClaimed();
+    error InsufficientMinimumAmountOut();
 
     /* ========== EVENTS ========== */
     
@@ -65,15 +66,20 @@ interface IWithdrawManager {
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
     
+    event InstantWithdrawalCapacityUpdated(uint256 capacity);
+    
+    event InstantWithdrawalRefillRateUpdated(uint64 refillRate);
+    
     /* ========== MAIN FUNCTIONS ========== */
     
     /**
      * @notice Queue a withdrawal request
      * @param beHypeAmount Amount of beHYPE tokens to withdraw
      * @param instant Whether to withdraw instantly for a fee or queue
+     * @param minAmountOut Minimum amount of HYPE to receive (protection against exchange rate changes)
      * @return withdrawalId The ID of the withdrawal request
      */
-    function withdraw(uint256 beHypeAmount, bool instant) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHypeAmount, bool instant, uint256 minAmountOut) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
@@ -129,5 +135,26 @@ interface IWithdrawManager {
      * @dev Only callable by the role registry
      */
     function unpauseWithdrawals() external;
+    
+    /**
+     * @notice Set the instant withdrawal fee in basis points
+     * @param _instantWithdrawalFeeInBps The new instant withdrawal fee in basis points
+     * @dev Only callable by the protocol guardian
+     */
+    function setInstantWithdrawalFeeInBps(uint16 _instantWithdrawalFeeInBps) external;
+    
+    /**
+     * @notice Set the instant withdrawal capacity
+     * @param capacity The new instant withdrawal capacity
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalCapacity(uint256 capacity) external;
+    
+    /**
+     * @notice Set the instant withdrawal refill rate per second
+     * @param refillRate The new instant withdrawal refill rate per second
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external;
     
 }

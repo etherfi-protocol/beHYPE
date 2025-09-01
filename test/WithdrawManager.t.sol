@@ -19,7 +19,7 @@ contract WithdrawManagerTest is BaseTest {
     function test_withdraw() public {
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
         vm.stopPrank();
 
         assertEq(beHYPE.balanceOf(user), 0 ether);
@@ -27,7 +27,7 @@ contract WithdrawManagerTest is BaseTest {
 
         vm.startPrank(user2);
         beHYPE.approve(address(withdrawManager), 10 ether);
-        withdrawManager.withdraw(10 ether, false);
+        withdrawManager.withdraw(10 ether, false, 9 ether);
         vm.stopPrank();
 
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 11 ether);
@@ -75,6 +75,35 @@ contract WithdrawManagerTest is BaseTest {
         withdrawManager.claimWithdrawal(10);
     }
 
+    function test_withdraw_reverts_amount_too_low() public {
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InsufficientMinimumAmountOut.selector));
+        withdrawManager.withdraw(1 ether, false, 1.1 ether);
+        withdrawManager.withdraw(1 ether, false, 1 ether);
+        vm.stopPrank();
+
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+        assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
+
+        DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
+        vm.warp(block.timestamp + (365 days * 100));
+        vm.prank(admin);
+        stakingCore.updateExchangeRatio();
+        assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
+
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InsufficientMinimumAmountOut.selector));
+        withdrawManager.withdraw(1 ether, false, 2.1 ether);
+        withdrawManager.withdraw(1 ether, false, 1.1 ether);
+        vm.stopPrank();
+    }
+
     function test_withdraw_with_exchange_rate() public {
         vm.deal(user, 100 ether);
         vm.prank(user);
@@ -84,10 +113,10 @@ contract WithdrawManagerTest is BaseTest {
 
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 20 ether);
-        withdrawManager.withdraw(5 ether, false);
-        withdrawManager.withdraw(5 ether, false);
-        withdrawManager.withdraw(5 ether, false);
-        withdrawManager.withdraw(5 ether, false);
+        withdrawManager.withdraw(5 ether, false, 4.5 ether);
+        withdrawManager.withdraw(5 ether, false, 4.5 ether);
+        withdrawManager.withdraw(5 ether, false, 4.5 ether);
+        withdrawManager.withdraw(5 ether, false, 4.5 ether);
         vm.stopPrank();
 
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);
@@ -112,6 +141,7 @@ contract WithdrawManagerTest is BaseTest {
         // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 90 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
@@ -144,16 +174,16 @@ contract WithdrawManagerTest is BaseTest {
         stakingCore.stake{value: 89 ether}("");
         assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
 
-        // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
 
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 100 ether);
-        withdrawManager.withdraw(45 ether, false);
+        withdrawManager.withdraw(45 ether, false, 40 ether);
         vm.stopPrank();
 
         vm.prank(admin);
@@ -163,12 +193,12 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(withdrawManager.getLiquidHypeAmount(), 10 ether);
 
         vm.startPrank(user);
-        withdrawManager.withdraw(1 ether, false);
-        withdrawManager.withdraw(1 ether, false);
-        withdrawManager.withdraw(1 ether, false);
-        withdrawManager.withdraw(1 ether, false);
-        withdrawManager.withdraw(1 ether, false);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
         vm.stopPrank();
 
         vm.startPrank(admin);
@@ -199,7 +229,7 @@ contract WithdrawManagerTest is BaseTest {
         vm.startPrank(user);
         uint256 userBalanceBefore = user.balance;
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, true);
+        withdrawManager.withdraw(1 ether, true, 0.9 ether);
         
         uint256 instantWithdrawalFee = 0.003 ether; // 30 bps fee on 1 ether
         assertEq(beHYPE.balanceOf(roleRegistry.protocolTreasury()), instantWithdrawalFee);
@@ -208,7 +238,7 @@ contract WithdrawManagerTest is BaseTest {
 
         beHYPE.approve(address(withdrawManager), 1 ether);
         vm.expectRevert(IWithdrawManager.InsufficientHYPELiquidity.selector);
-        withdrawManager.withdraw(0.1 ether, true);
+        withdrawManager.withdraw(0.1 ether, true, 0.09 ether);
     }
 
     function test_instantWithdrawal_with_exchange_rate() public {
@@ -219,10 +249,11 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
 
         mockDepositToHyperCore(96 ether);
+        vm.roll(block.number + 5);
 
-        // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
@@ -230,14 +261,14 @@ contract WithdrawManagerTest is BaseTest {
         uint256 userBalanceBefore = user.balance;
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, true);
+        withdrawManager.withdraw(1 ether, true, 1.9 ether);
 
         assertEq(beHYPE.balanceOf(roleRegistry.protocolTreasury()), 0.003 ether);
         assertEq(user.balance - userBalanceBefore, stakingCore.BeHYPEToHYPE(0.997 ether));
 
         beHYPE.approve(address(withdrawManager), 1 ether);
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InsufficientHYPELiquidity.selector));
-        withdrawManager.withdraw(0.1 ether, true);
+        withdrawManager.withdraw(0.1 ether, true, 0.18 ether);
     }
 
     function test_instantWithdrawalRateLimit() public {
@@ -247,16 +278,16 @@ contract WithdrawManagerTest is BaseTest {
         stakingCore.stake{value: 5000 ether}("");
         
         beHYPE.approve(address(withdrawManager), 15 ether);
-        withdrawManager.withdraw(5 ether, true);
+        withdrawManager.withdraw(5 ether, true, 4.5 ether);
 
-        withdrawManager.withdraw(5 ether, true);
+        withdrawManager.withdraw(5 ether, true, 4.5 ether);
 
         
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
-        withdrawManager.withdraw(5 ether, true);
+        withdrawManager.withdraw(5 ether, true, 4.5 ether);
 
         vm.warp(block.timestamp + 1 days);
-        withdrawManager.withdraw(5 ether, true);
+        withdrawManager.withdraw(5 ether, true, 4.5 ether);
     }
 
     function test_multipleUsersMultipleWithdrawals() public {
@@ -275,31 +306,31 @@ contract WithdrawManagerTest is BaseTest {
         // User 1: 1 ether stake, 2 withdrawals (0.3 ether, 0.7 ether)
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(0.3 ether, false);
-        withdrawManager.withdraw(0.7 ether, false);
+        withdrawManager.withdraw(0.3 ether, false, 0.27 ether);
+        withdrawManager.withdraw(0.7 ether, false, 0.63 ether);
         vm.stopPrank();
         
         // User 2: 10 ether stake, 3 withdrawals (2 ether, 3 ether, 5 ether)
         vm.startPrank(user2);
         beHYPE.approve(address(withdrawManager), 10 ether);
-        withdrawManager.withdraw(2 ether, false);
-        withdrawManager.withdraw(3 ether, false);
-        withdrawManager.withdraw(5 ether, false);
+        withdrawManager.withdraw(2 ether, false, 1.8 ether);
+        withdrawManager.withdraw(3 ether, false, 2.7 ether);
+        withdrawManager.withdraw(5 ether, false, 4.5 ether);
         vm.stopPrank();
         
         // User 3: 25 ether stake, 2 withdrawals (8 ether, 17 ether)
         vm.startPrank(user3);
         beHYPE.approve(address(withdrawManager), 25 ether);
-        withdrawManager.withdraw(8 ether, false);
-        withdrawManager.withdraw(17 ether, false);
+        withdrawManager.withdraw(8 ether, false, 7.2 ether);
+        withdrawManager.withdraw(17 ether, false, 15.3 ether);
         vm.stopPrank();
         
         // User 4: 40 ether stake, 3 withdrawals (10 ether, 15 ether, 15 ether)
         vm.startPrank(user4);
         beHYPE.approve(address(withdrawManager), 40 ether);
-        withdrawManager.withdraw(10 ether, false);
-        withdrawManager.withdraw(15 ether, false);
-        withdrawManager.withdraw(15 ether, false);
+        withdrawManager.withdraw(10 ether, false, 9 ether);
+        withdrawManager.withdraw(15 ether, false, 13.5 ether);
+        withdrawManager.withdraw(15 ether, false, 13.5 ether);
         vm.stopPrank();
 
         uint256 userBalanceBefore = user.balance;
@@ -425,5 +456,4 @@ contract WithdrawManagerTest is BaseTest {
             1 days
         );
     }
-
 }

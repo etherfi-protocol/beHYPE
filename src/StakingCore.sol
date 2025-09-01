@@ -22,9 +22,10 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     IBeHYPEToken public beHypeToken;
     address public withdrawManager;
     uint256 public exchangeRatio;
-    uint32 public acceptablAprInBps;
+    uint16 public acceptablAprInBps;
     bool public exchangeRateGuard;
     uint256 public lastExchangeRatioUpdate;
+    uint256 public lastHyperCoreOperationBlock;
 
     /* ========== CONSTANTS ========== */
 
@@ -32,6 +33,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     address public constant L1_HYPE_CONTRACT = 0x2222222222222222222222222222222222222222;
     L1Read public constant l1Read = L1Read(0xb7467E0524Afba7006957701d1F06A59000d15A2);
     CoreWriter public constant coreWriter = CoreWriter(0x3333333333333333333333333333333333333333);
+    uint256 public constant MIN_BLOCKS_BEFORE_EXCHANGE_RATIO_UPDATE = 5;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -42,7 +44,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         address _roleRegistry,
         address _beHype,
         address _withdrawManager,
-        uint32 _acceptablAprInBps,
+        uint16 _acceptablAprInBps,
         bool _exchangeRateGuard
     ) public initializer {
         __UUPSUpgradeable_init();
@@ -55,6 +57,7 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
         exchangeRatio = 1 ether;
         lastExchangeRatioUpdate = block.timestamp;
+        lastHyperCoreOperationBlock = block.number;
     }
 
     /* ========== MAIN FUNCTIONS ========== */
@@ -71,6 +74,11 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
     function updateExchangeRatio() external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
+
+        uint256 blocksPassed = block.number - lastHyperCoreOperationBlock;
+        if (blocksPassed < MIN_BLOCKS_BEFORE_EXCHANGE_RATIO_UPDATE) {
+            revert ExchangeRatioUpdateTooSoon(MIN_BLOCKS_BEFORE_EXCHANGE_RATIO_UPDATE, blocksPassed);
+        }
 
         uint256 totalProtocolHype = getTotalProtocolHype();
         
@@ -121,11 +129,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
     function updateAcceptableApr(uint16 _acceptablAprInBps) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
         acceptablAprInBps = _acceptablAprInBps;
+        emit AcceptableAprUpdated(_acceptablAprInBps);
     }
 
     function updateExchangeRateGuard(bool _exchangeRateGuard) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
         exchangeRateGuard = _exchangeRateGuard;
+        emit ExchangeRateGuardUpdated(_exchangeRateGuard);
     }
 
     function depositToHyperCore(uint256 amount) external {
@@ -133,6 +143,8 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
 
         (bool success,) = payable(L1_HYPE_CONTRACT).call{value: amount}("");
         if (!success) revert FailedToDepositToHyperCore();
+        
+        lastHyperCoreOperationBlock = block.number;
         emit HyperCoreDeposit(amount);
     }
 
@@ -219,8 +231,9 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
      * @param actionData The encoded action data
      */
     function _encodeAction(uint8 actionId, bytes memory actionData) internal {
-        bytes memory data = new bytes(4 + actionData.length);
+        lastHyperCoreOperationBlock = block.number;
 
+        bytes memory data = new bytes(4 + actionData.length);
         data[0] = 0x01;
         data[1] = 0x00;
         data[2] = 0x00;

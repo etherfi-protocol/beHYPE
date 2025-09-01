@@ -94,7 +94,7 @@ contract WithdrawManager is
     /* ========== MAIN FUNCTIONS ========== */
     
     function withdraw(
-        uint256 beHypeAmount, bool instant
+        uint256 beHypeAmount, bool instant, uint256 minAmountOut
     ) external nonReentrant returns (uint256 withdrawalId) {
         if (paused()) revert WithdrawalsPaused();
         if (beHypeAmount < minWithdrawalAmount) revert InvalidAmount();
@@ -106,24 +106,24 @@ contract WithdrawManager is
             if (!_canRateLimiterConsume(hypeAmount)) revert InstantWithdrawalRateLimitExceeded();
             if (!canInstantWithdraw(beHypeAmount)) revert InsufficientHYPELiquidity();
 
+            uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
+            uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
+            uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
+            if (hypeWithdrawalAfterFee < minAmountOut) revert InsufficientMinimumAmountOut();
+
             _updateRateLimit(hypeAmount);
 
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
-
-            uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
             beHypeToken.transfer(roleRegistry.protocolTreasury(), instantWithdrawalFee);
-            uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
-            uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
-
             beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
             stakingCore.sendFromWithdrawManager(hypeWithdrawalAfterFee, msg.sender);
 
             emit InstantWithdrawal(msg.sender, beHypeAmount, hypeWithdrawalAfterFee, instantWithdrawalFee);
         } else {
+            if (hypeAmount < minAmountOut) revert InsufficientMinimumAmountOut();
+
             withdrawalId = withdrawalQueue.length;
             hypeRequestedForWithdraw += hypeAmount;
-        
-            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
         
             withdrawalQueue.push(WithdrawalEntry({
                 user: msg.sender,
@@ -131,8 +131,9 @@ contract WithdrawManager is
                 hypeAmount: hypeAmount,
                 claimed: false
             }));
-        
             userWithdrawals[msg.sender].push(withdrawalId);
+
+            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
                 
             emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount, withdrawalId);
         }
@@ -191,11 +192,13 @@ contract WithdrawManager is
         // max capacity = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE, which is practically enough
         uint64 bucketUnit = _convertToBucketUnit(capacity, Math.Rounding.Floor);
         BucketLimiter.setCapacity(instantWithdrawalLimit, bucketUnit);
+        emit InstantWithdrawalCapacityUpdated(capacity);
     }
 
     function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         BucketLimiter.setRefillRate(instantWithdrawalLimit, refillRate);
+        emit InstantWithdrawalRefillRateUpdated(refillRate);
     }
 
     function pauseWithdrawals() external {
