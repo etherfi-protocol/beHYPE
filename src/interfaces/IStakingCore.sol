@@ -113,7 +113,6 @@ interface IStakingCore {
     /**
      * @notice Allows the withdraw manager to send HYPE to the user
      * @param amount The amount of HYPE to send
-     * @param to The address to send the HYPE to
      * @dev Only callable by the withdraw manager
      */
     function sendFromWithdrawManager(uint256 amount, address to) external;

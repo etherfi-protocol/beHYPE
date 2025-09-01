@@ -34,27 +34,45 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(beHYPE.balanceOf(user2), 0 ether);
         assertEq(beHYPE.balanceOf(address(withdrawManager)), 11 ether);
 
-        uint256[] memory unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user);
-        assertEq(unFinalizedWithdrawals.length, 1);
-        assertEq(unFinalizedWithdrawals[0], 1);
+        uint256[] memory unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user);
+        assertEq(unclaimedWithdrawals.length, 1);
+        assertEq(unclaimedWithdrawals[0], 1);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user2);
-        assertEq(unFinalizedWithdrawals.length, 1);
-        assertEq(unFinalizedWithdrawals[0], 2);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user2);
+        assertEq(unclaimedWithdrawals.length, 1);
+        assertEq(unclaimedWithdrawals[0], 2);
 
         uint256 balanceBeforeBeHYPE = beHYPE.balanceOf(address(withdrawManager));
         uint256 balanceBefore = address(user).balance;
         vm.prank(admin);
         withdrawManager.finalizeWithdrawals(1);
         assertEq(beHYPE.balanceOf(address(withdrawManager)), balanceBeforeBeHYPE - 1 ether);
+        assertEq(user.balance, balanceBefore);
+
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user);
+        assertEq(unclaimedWithdrawals.length, 1);
+        assertEq(unclaimedWithdrawals[0], 1);
+
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user2);
+        assertEq(unclaimedWithdrawals.length, 1);
+        assertEq(unclaimedWithdrawals[0], 2);
+
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(1);
         assertEq(user.balance, balanceBefore + 1 ether);
+        assertEq(beHYPE.balanceOf(address(withdrawManager)), balanceBeforeBeHYPE - 1 ether);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user);
-        assertEq(unFinalizedWithdrawals.length, 0);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotClaimable.selector));
+        withdrawManager.claimWithdrawal(1);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user2);
-        assertEq(unFinalizedWithdrawals.length, 1);
-        assertEq(unFinalizedWithdrawals[0], 2);
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotClaimable.selector));
+        withdrawManager.claimWithdrawal(2);
+
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.WithdrawalNotClaimable.selector));
+        withdrawManager.claimWithdrawal(10);
     }
 
     function test_withdraw_reverts_amount_too_low() public {
@@ -109,7 +127,16 @@ contract WithdrawManagerTest is BaseTest {
 
         assertEq(stakingCore.getTotalProtocolHype(), 90 ether);
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 10 ether);
-        assertEq(user.balance, balanceBefore + 10 ether);
+        
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(1);
+        assertEq(user.balance, balanceBefore + 5 ether); 
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 10 ether);
+        
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(2);
+        assertEq(user.balance, balanceBefore + 10 ether); 
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 10 ether);
 
         // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 90 ether, 0, 0);
@@ -126,7 +153,7 @@ contract WithdrawManagerTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(IStakingCore.NotAuthorized.selector));
         stakingCore.withdrawFromStaking(11 ether);
 
-        stakingCore.withdrawFromHyperCore(5 ether);
+        stakingCore.withdrawFromHyperCore(10 ether);
         vm.expectRevert(abi.encodeWithSelector(IStakingCore.NotAuthorized.selector));
         stakingCore.withdrawFromHyperCore(11 ether);
         vm.stopPrank();
@@ -134,6 +161,9 @@ contract WithdrawManagerTest is BaseTest {
         vm.prank(admin);
         withdrawManager.finalizeWithdrawals(4);
 
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(3);
+        withdrawManager.claimWithdrawal(4);
         assertEq(user.balance, balanceBefore + 20 ether);
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 0);
     }
@@ -308,31 +338,45 @@ contract WithdrawManagerTest is BaseTest {
         uint256 user3BalanceBefore = user3.balance;
         uint256 user4BalanceBefore = user4.balance;
 
-        uint256[] memory unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user);
-        assertEq(unFinalizedWithdrawals.length, 2);
-        assertEq(unFinalizedWithdrawals[0], 1);
-        assertEq(unFinalizedWithdrawals[1], 2);
+        uint256[] memory unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user);
+        assertEq(unclaimedWithdrawals.length, 2);
+        assertEq(unclaimedWithdrawals[0], 1);
+        assertEq(unclaimedWithdrawals[1], 2);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user2);
-        assertEq(unFinalizedWithdrawals.length, 3);
-        assertEq(unFinalizedWithdrawals[0], 3);
-        assertEq(unFinalizedWithdrawals[1], 4);
-        assertEq(unFinalizedWithdrawals[2], 5);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user2);
+        assertEq(unclaimedWithdrawals.length, 3);
+        assertEq(unclaimedWithdrawals[0], 3);
+        assertEq(unclaimedWithdrawals[1], 4);
+        assertEq(unclaimedWithdrawals[2], 5);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user3);
-        assertEq(unFinalizedWithdrawals.length, 2);
-        assertEq(unFinalizedWithdrawals[0], 6);
-        assertEq(unFinalizedWithdrawals[1], 7);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user3);
+        assertEq(unclaimedWithdrawals.length, 2);
+        assertEq(unclaimedWithdrawals[0], 6);
+        assertEq(unclaimedWithdrawals[1], 7);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user4);
-        assertEq(unFinalizedWithdrawals.length, 3);
-        assertEq(unFinalizedWithdrawals[0], 8);
-        assertEq(unFinalizedWithdrawals[1], 9);
-        assertEq(unFinalizedWithdrawals[2], 10);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user4);
+        assertEq(unclaimedWithdrawals.length, 3);
+        assertEq(unclaimedWithdrawals[0], 8);
+        assertEq(unclaimedWithdrawals[1], 9);
+        assertEq(unclaimedWithdrawals[2], 10);
 
         // Finalize withdrawals in batches
         vm.prank(admin);
         withdrawManager.finalizeWithdrawals(6); // Finalize first 5 withdrawals (users 1, 2, and user 3 first withdrawal)
+
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(1);
+        vm.prank(user);
+        withdrawManager.claimWithdrawal(2);
+
+        vm.startPrank(user2);
+        withdrawManager.claimWithdrawal(3);
+        withdrawManager.claimWithdrawal(4);
+        withdrawManager.claimWithdrawal(5);
+        vm.stopPrank();
+
+        vm.prank(user3);
+        withdrawManager.claimWithdrawal(6);
 
         assertEq(user.balance, userBalanceBefore + 1 ether);
         assertEq(user2.balance, user2BalanceBefore + 10 ether);
@@ -341,20 +385,30 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 57 ether);
         assertEq(withdrawManager.getPendingWithdrawalsCount(), 4);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user);
-        assertEq(unFinalizedWithdrawals.length, 0);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user);
+        assertEq(unclaimedWithdrawals.length, 0);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user2);
-        assertEq(unFinalizedWithdrawals.length, 0);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user2);
+        assertEq(unclaimedWithdrawals.length, 0);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user3);
-        assertEq(unFinalizedWithdrawals.length, 1);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user3);
+        assertEq(unclaimedWithdrawals.length, 1);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user4);
-        assertEq(unFinalizedWithdrawals.length, 3);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user4);
+        assertEq(unclaimedWithdrawals.length, 3);
         
         vm.prank(admin);
         withdrawManager.finalizeWithdrawals(10);
+
+        vm.prank(user3);
+        withdrawManager.claimWithdrawal(7);
+
+        vm.prank(user4);
+        withdrawManager.claimWithdrawal(8);
+        vm.prank(user4);
+        withdrawManager.claimWithdrawal(9);
+        vm.prank(user4);
+        withdrawManager.claimWithdrawal(10);
 
         assertEq(user.balance, userBalanceBefore + 1 ether);
         assertEq(user2.balance, user2BalanceBefore + 10 ether);
@@ -364,11 +418,11 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(withdrawManager.getPendingWithdrawalsCount(), 0);
         assertEq(beHYPE.balanceOf(address(withdrawManager)), 0);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user3);
-        assertEq(unFinalizedWithdrawals.length, 0);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user3);
+        assertEq(unclaimedWithdrawals.length, 0);
 
-        unFinalizedWithdrawals = withdrawManager.getUserUnFinalizedWithdrawals(user4);
-        assertEq(unFinalizedWithdrawals.length, 0);
+        unclaimedWithdrawals = withdrawManager.getUserUnclaimedWithdrawals(user4);
+        assertEq(unclaimedWithdrawals.length, 0);
     }
     function test_RevertUpgradeUnauthorized() public {
         WithdrawManager newWithdrawManagerImpl = new WithdrawManager();

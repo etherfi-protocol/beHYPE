@@ -87,7 +87,7 @@ contract WithdrawManager is
             user: address(0),
             beHypeAmount: 0,
             hypeAmount: 0,
-            finalized: true
+            claimed: true
         }));
     }
     
@@ -129,7 +129,7 @@ contract WithdrawManager is
                 user: msg.sender,
                 beHypeAmount: beHypeAmount,
                 hypeAmount: hypeAmount,
-                finalized: false
+                claimed: false
             }));
             userWithdrawals[msg.sender].push(withdrawalId);
 
@@ -140,27 +140,39 @@ contract WithdrawManager is
         
     }
 
+    function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
+        if (paused()) revert WithdrawalsPaused();
+        if (!canClaimWithdrawal(withdrawalId)) revert WithdrawalNotClaimable();
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        if (entry.claimed) revert AlreadyClaimed();
+        
+        entry.claimed = true;
+        
+        (bool success, ) = payable(entry.user).call{value: entry.hypeAmount}("");
+        if (!success) revert TransferFailed();
+        
+        emit WithdrawalClaimed(entry.user, withdrawalId, entry.hypeAmount);
+    }
+
     /* ========== ADMIN FUNCTIONS ========== */
 
-    function finalizeWithdrawals(uint256 index) external {
+    function finalizeWithdrawals(uint256 index) external nonReentrant {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (index >= withdrawalQueue.length) revert IndexOutOfBounds();
         if (index <= lastFinalizedIndex) revert CanOnlyFinalizeForward();
 
-
         uint256 hypeAmountToFinalize = 0;
         uint256 beHypeAmountToFinalize = 0;
         for (uint256 i = lastFinalizedIndex + 1; i <= index;) {
-            stakingCore.sendFromWithdrawManager(withdrawalQueue[i].hypeAmount, withdrawalQueue[i].user);
             beHypeAmountToFinalize += withdrawalQueue[i].beHypeAmount;
             hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
-            withdrawalQueue[i].finalized = true;
 
             unchecked { ++i; }
         }
-
         lastFinalizedIndex = index;
+
         beHypeToken.burn(address(this), beHypeAmountToFinalize);
+        stakingCore.sendFromWithdrawManager(hypeAmountToFinalize, address(this));
         hypeRequestedForWithdraw -= hypeAmountToFinalize;
 
         emit WithdrawalsBatchFinalized(index);
@@ -204,24 +216,32 @@ contract WithdrawManager is
     function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory) {
         return withdrawalQueue[index];
     }
+
+    function canClaimWithdrawal(uint256 withdrawalId) public view returns (bool) {
+        if (withdrawalId >= withdrawalQueue.length) return false;
+        if (withdrawalId > lastFinalizedIndex) return false;
+        
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        return !entry.claimed;
+    }
     
-    function getUserUnFinalizedWithdrawals(address user) external view returns (uint256[] memory) {
-        uint256[] memory unFinalizedWithdrawals = new uint256[](userWithdrawals[user].length);
+    function getUserUnclaimedWithdrawals(address user) external view returns (uint256[] memory) {
+        uint256[] memory unclaimedWithdrawals = new uint256[](userWithdrawals[user].length);
         uint256 count = 0;
         for (uint256 i = 0; i < userWithdrawals[user].length;) {
             WithdrawalEntry storage entry = withdrawalQueue[userWithdrawals[user][i]];
-            if (!entry.finalized) {
-                unFinalizedWithdrawals[count] = userWithdrawals[user][i];
+            if (!entry.claimed) {
+                unclaimedWithdrawals[count] = userWithdrawals[user][i];
                 unchecked { ++count; }
             }
             unchecked { ++i; }
         }
 
         assembly {
-            mstore(unFinalizedWithdrawals, count)
+            mstore(unclaimedWithdrawals, count)
         }
 
-        return unFinalizedWithdrawals;
+        return unclaimedWithdrawals;
     }
 
     /**
