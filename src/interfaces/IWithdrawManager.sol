@@ -74,12 +74,12 @@ interface IWithdrawManager {
     
     /**
      * @notice Queue a withdrawal request
-     * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @param beHYPEAmount Amount of beHYPE tokens to withdraw
      * @param instant Whether to withdraw instantly for a fee or queue
      * @param minAmountOut Minimum amount of HYPE to receive (protection against exchange rate changes)
      * @return withdrawalId The ID of the withdrawal request
      */
-    function withdraw(uint256 beHypeAmount, bool instant, uint256 minAmountOut) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHYPEAmount, bool instant, uint256 minAmountOut) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
@@ -97,10 +97,10 @@ interface IWithdrawManager {
     
     /**
      * @notice Check if a withdrawal amount can be instant withdrawn
-     * @param beHypeAmount Amount of beHYPE tokens to withdraw
+     * @param beHYPEAmount Amount of beHYPE tokens to withdraw
      * @return bool True if the withdrawal can be instant withdrawn
      */
-    function canInstantWithdraw(uint256 beHypeAmount) external view returns (bool);
+    function canInstantWithdraw(uint256 beHYPEAmount) external view returns (bool);
     
     /**
      * @notice Get a withdrawal entry from the queue

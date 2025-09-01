@@ -201,12 +201,12 @@ interface IStakingCore {
     /* ========== VIEW FUNCTIONS ========== */
 
     /**
-     * @notice Converts kHYPE amount to HYPE using current exchange ratio
-     * @param kHYPEAmount The amount of kHYPE tokens to convert
+     * @notice Converts beHYPE amount to HYPE using current exchange ratio
+     * @param beHYPEAmount The amount of beHYPE tokens to convert
      * @return The equivalent amount of HYPE tokens
      * @dev Uses current exchange ratio for conversion
      */
-    function BeHYPEToHYPE(uint256 kHYPEAmount) external view returns (uint256);
+    function BeHYPEToHYPE(uint256 beHYPEAmount) external view returns (uint256);
 
     /**
      * @notice Converts HYPE amount to kHYPE using current exchange ratio

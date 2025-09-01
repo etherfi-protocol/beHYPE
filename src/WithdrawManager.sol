@@ -56,8 +56,8 @@ contract WithdrawManager is
     }
     
     function initialize(
-        uint256 _minStakeAmount,
-        uint256 _maxStakeAmount,
+        uint256 _minWithdrawAmount,
+        uint256 _maxWithdrawAmount,
         uint16 _lowWatermarkInBpsOfTvl,
         uint16 _instantWithdrawalFeeInBps,
         address _roleRegistry,
@@ -69,8 +69,8 @@ contract WithdrawManager is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
-        minWithdrawalAmount = _minStakeAmount;
-        maxWithdrawalAmount = _maxStakeAmount;
+        minWithdrawalAmount = _minWithdrawAmount;
+        maxWithdrawalAmount = _maxWithdrawAmount;
         lowWatermarkInBpsOfTvl = _lowWatermarkInBpsOfTvl;
         instantWithdrawalFeeInBps = _instantWithdrawalFeeInBps;
         
