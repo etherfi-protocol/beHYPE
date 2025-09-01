@@ -119,6 +119,28 @@ contract StakingCoreTest is BaseTest {
             true
         );
     }
+    
+    function test_depositToHyperCore_should_revert_with_various_precision_loss_scenarios() public {
+        test_stake();
+        
+        uint256[] memory problematicAmounts = new uint256[](3);
+        problematicAmounts[0] = 1 ether + 1;
+        problematicAmounts[1] = 1 ether + 1000;
+        problematicAmounts[2] = 1 ether + 1e9;
+
+        for (uint256 i = 0; i < problematicAmounts.length; i++) {
+            uint256 amount = problematicAmounts[i];
+            uint256 expectedTruncated = amount / 1e10 * 1e10;
+            
+            vm.prank(admin);
+            vm.expectRevert(abi.encodeWithSelector(
+                IStakingCore.PrecisionLossDetected.selector, 
+                amount, 
+                expectedTruncated
+            ));
+            stakingCore.depositToHyperCore(amount);
+        }
+    }
 
     function test_ExchangeRatioUpdateGuard() public {
         test_stake();

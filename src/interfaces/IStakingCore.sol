@@ -22,6 +22,7 @@ interface IStakingCore {
     error StakingPaused();
     error ElapsedTimeCannotBeZero();
     error FailedToSendFromWithdrawManager();
+    error PrecisionLossDetected(uint256 amount, uint256 truncatedAmount);
     error ExchangeRatioUpdateTooSoon(uint256 blocksRequired, uint256 blocksPassed);
 
     /* ========== EVENTS ========== */
