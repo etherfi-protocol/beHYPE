@@ -85,6 +85,7 @@ contract WithdrawManagerTest is BaseTest {
         // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 90 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
@@ -117,6 +118,7 @@ contract WithdrawManagerTest is BaseTest {
         // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
@@ -189,10 +191,11 @@ contract WithdrawManagerTest is BaseTest {
         assertEq(stakingCore.getTotalProtocolHype(), 100 ether);
 
         mockDepositToHyperCore(96 ether);
+        vm.roll(block.number + 5);
 
-        // update exchange rate to 1 BeHYPE = 2 HYPE
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);
