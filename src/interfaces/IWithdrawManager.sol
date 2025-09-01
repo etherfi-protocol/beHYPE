@@ -18,7 +18,7 @@ interface IWithdrawManager {
         address user;              // Address of the user
         uint256 beHypeAmount;      // Amount of beHYPE tokens locked for withdrawal
         uint256 hypeAmount;        // Amount of HYPE to be withdrawn
-        bool finalized;            // Whether the withdrawal has been finalized
+        bool claimed;            // Whether the withdrawal has been claimed
     }
 
     /* ========== ERRORS ========== */
@@ -29,13 +29,15 @@ interface IWithdrawManager {
     error NotAuthorized();
     error IndexOutOfBounds();
     error CanOnlyFinalizeForward();
-    error WithdrawalNotFinalized();
+    error WithdrawalNotClaimable();
     error InvalidWithdrawalID();
     error TransferFailed();
     error WithdrawalsNotPaused();
     error InsufficientHYPELiquidity();
     error InstantWithdrawalRateLimitExceeded();
     error InvalidInstantWithdrawalFee();
+    error AlreadyClaimed();
+    error InsufficientMinimumAmountOut();
 
     /* ========== EVENTS ========== */
     
@@ -48,6 +50,12 @@ interface IWithdrawManager {
     );
     
     event WithdrawalsBatchFinalized(uint256 upToIndex);
+
+    event WithdrawalClaimed(
+        address indexed user,
+        uint256 indexed withdrawalId,
+        uint256 hypeAmount
+    );
     
     event InstantWithdrawal(
         address indexed user,
@@ -58,15 +66,20 @@ interface IWithdrawManager {
     
     event InstantWithdrawalFeeInBpsUpdated(uint256 instantWithdrawalFeeInBps);
     
+    event InstantWithdrawalCapacityUpdated(uint256 capacity);
+    
+    event InstantWithdrawalRefillRateUpdated(uint64 refillRate);
+    
     /* ========== MAIN FUNCTIONS ========== */
     
     /**
      * @notice Queue a withdrawal request
      * @param beHypeAmount Amount of beHYPE tokens to withdraw
      * @param instant Whether to withdraw instantly for a fee or queue
+     * @param minAmountOut Minimum amount of HYPE to receive (protection against exchange rate changes)
      * @return withdrawalId The ID of the withdrawal request
      */
-    function withdraw(uint256 beHypeAmount, bool instant) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHypeAmount, bool instant, uint256 minAmountOut) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
@@ -97,6 +110,13 @@ interface IWithdrawManager {
     function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory);
 
     /**
+     * @notice Check if a withdrawal can be claimed
+     * @param withdrawalId The ID of the withdrawal
+     * @return bool True if the withdrawal can be claimed
+     */
+    function canClaimWithdrawal(uint256 withdrawalId) external view returns (bool);
+
+    /**
      * @notice Get the amount of hype requested for withdrawal
      * @return uint256 The amount of hype requested for withdrawal
      */
@@ -115,5 +135,26 @@ interface IWithdrawManager {
      * @dev Only callable by the role registry
      */
     function unpauseWithdrawals() external;
+    
+    /**
+     * @notice Set the instant withdrawal fee in basis points
+     * @param _instantWithdrawalFeeInBps The new instant withdrawal fee in basis points
+     * @dev Only callable by the protocol guardian
+     */
+    function setInstantWithdrawalFeeInBps(uint16 _instantWithdrawalFeeInBps) external;
+    
+    /**
+     * @notice Set the instant withdrawal capacity
+     * @param capacity The new instant withdrawal capacity
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalCapacity(uint256 capacity) external;
+    
+    /**
+     * @notice Set the instant withdrawal refill rate per second
+     * @param refillRate The new instant withdrawal refill rate per second
+     * @dev Only callable by the protocol admin
+     */
+    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external;
     
 }

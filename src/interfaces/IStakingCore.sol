@@ -23,6 +23,7 @@ interface IStakingCore {
     error ElapsedTimeCannotBeZero();
     error FailedToSendFromWithdrawManager();
     error PrecisionLossDetected(uint256 amount, uint256 truncatedAmount);
+    error ExchangeRatioUpdateTooSoon(uint256 blocksRequired, uint256 blocksPassed);
 
     /* ========== EVENTS ========== */
 
@@ -80,6 +81,18 @@ interface IStakingCore {
      */
     event WithdrawManagerUpdated(address withdrawManager);
 
+    /**
+     * @notice Emitted when the acceptable APR is updated
+     * @param newAprInBps The new acceptable APR in basis points
+     */
+    event AcceptableAprUpdated(uint16 newAprInBps);
+
+    /**
+     * @notice Emitted when the exchange rate guard is updated
+     * @param newExchangeRateGuard The new exchange rate guard value
+     */
+    event ExchangeRateGuardUpdated(bool newExchangeRateGuard);
+
     /* ========== MAIN FUNCTIONS ========== */
 
     /**
@@ -101,7 +114,6 @@ interface IStakingCore {
     /**
      * @notice Allows the withdraw manager to send HYPE to the user
      * @param amount The amount of HYPE to send
-     * @param to The address to send the HYPE to
      * @dev Only callable by the withdraw manager
      */
     function sendFromWithdrawManager(uint256 amount, address to) external;
