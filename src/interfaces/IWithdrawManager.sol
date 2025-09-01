@@ -36,6 +36,7 @@ interface IWithdrawManager {
     error InsufficientHYPELiquidity();
     error InstantWithdrawalRateLimitExceeded();
     error InvalidInstantWithdrawalFee();
+    error InsufficientMinimumAmountOut();
 
     /* ========== EVENTS ========== */
     
@@ -68,9 +69,10 @@ interface IWithdrawManager {
      * @notice Queue a withdrawal request
      * @param beHypeAmount Amount of beHYPE tokens to withdraw
      * @param instant Whether to withdraw instantly for a fee or queue
+     * @param minAmountOut Minimum amount of HYPE to receive (protection against exchange rate changes)
      * @return withdrawalId The ID of the withdrawal request
      */
-    function withdraw(uint256 beHypeAmount, bool instant) external returns (uint256 withdrawalId);
+    function withdraw(uint256 beHypeAmount, bool instant, uint256 minAmountOut) external returns (uint256 withdrawalId);
     
     /**
      * @notice Finalize withdrawals up to a specific index (protocol governor only)
