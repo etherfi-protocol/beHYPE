@@ -56,8 +56,8 @@ contract WithdrawManager is
     }
     
     function initialize(
-        uint256 _minStakeAmount,
-        uint256 _maxStakeAmount,
+        uint256 _minWithdrawAmount,
+        uint256 _maxWithdrawAmount,
         uint16 _lowWatermarkInBpsOfTvl,
         uint16 _instantWithdrawalFeeInBps,
         address _roleRegistry,
@@ -69,8 +69,8 @@ contract WithdrawManager is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
-        minWithdrawalAmount = _minStakeAmount;
-        maxWithdrawalAmount = _maxStakeAmount;
+        minWithdrawalAmount = _minWithdrawAmount;
+        maxWithdrawalAmount = _maxWithdrawAmount;
         lowWatermarkInBpsOfTvl = _lowWatermarkInBpsOfTvl;
         instantWithdrawalFeeInBps = _instantWithdrawalFeeInBps;
         
@@ -87,14 +87,14 @@ contract WithdrawManager is
             user: address(0),
             beHypeAmount: 0,
             hypeAmount: 0,
-            finalized: true
+            claimed: true
         }));
     }
     
     /* ========== MAIN FUNCTIONS ========== */
     
     function withdraw(
-        uint256 beHypeAmount, bool instant
+        uint256 beHypeAmount, bool instant, uint256 minAmountOut
     ) external nonReentrant returns (uint256 withdrawalId) {
         if (paused()) revert WithdrawalsPaused();
         if (beHypeAmount < minWithdrawalAmount) revert InvalidAmount();
@@ -106,61 +106,73 @@ contract WithdrawManager is
             if (!_canRateLimiterConsume(hypeAmount)) revert InstantWithdrawalRateLimitExceeded();
             if (!canInstantWithdraw(beHypeAmount)) revert InsufficientHYPELiquidity();
 
+            uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
+            uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
+            uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
+            if (hypeWithdrawalAfterFee < minAmountOut) revert InsufficientMinimumAmountOut();
+
             _updateRateLimit(hypeAmount);
 
             beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
-
-            uint256 instantWithdrawalFee = beHypeAmount.mulDiv(instantWithdrawalFeeInBps, BASIS_POINT_SCALE);
             beHypeToken.transfer(roleRegistry.protocolTreasury(), instantWithdrawalFee);
-            uint256 beHypeWithdrawalAfterFee = beHypeAmount - instantWithdrawalFee;
-            uint256 hypeWithdrawalAfterFee = stakingCore.BeHYPEToHYPE(beHypeWithdrawalAfterFee);
-
             beHypeToken.burn(address(this), beHypeWithdrawalAfterFee);
-
             stakingCore.sendFromWithdrawManager(hypeWithdrawalAfterFee, msg.sender);
 
             emit InstantWithdrawal(msg.sender, beHypeAmount, hypeWithdrawalAfterFee, instantWithdrawalFee);
         } else {
+            if (hypeAmount < minAmountOut) revert InsufficientMinimumAmountOut();
+
             withdrawalId = withdrawalQueue.length;
             hypeRequestedForWithdraw += hypeAmount;
-        
-            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
         
             withdrawalQueue.push(WithdrawalEntry({
                 user: msg.sender,
                 beHypeAmount: beHypeAmount,
                 hypeAmount: hypeAmount,
-                finalized: false
+                claimed: false
             }));
-        
             userWithdrawals[msg.sender].push(withdrawalId);
+
+            beHypeToken.transferFrom(msg.sender, address(this), beHypeAmount);
                 
             emit WithdrawalQueued(msg.sender, withdrawalId, beHypeAmount, hypeAmount, withdrawalId);
         }
         
     }
 
+    function claimWithdrawal(uint256 withdrawalId) external nonReentrant {
+        if (paused()) revert WithdrawalsPaused();
+        if (!canClaimWithdrawal(withdrawalId)) revert WithdrawalNotClaimable();
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        if (entry.claimed) revert AlreadyClaimed();
+        
+        entry.claimed = true;
+        
+        (bool success, ) = payable(entry.user).call{value: entry.hypeAmount}("");
+        if (!success) revert TransferFailed();
+        
+        emit WithdrawalClaimed(entry.user, withdrawalId, entry.hypeAmount);
+    }
+
     /* ========== ADMIN FUNCTIONS ========== */
 
-    function finalizeWithdrawals(uint256 index) external {
+    function finalizeWithdrawals(uint256 index) external nonReentrant {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         if (index >= withdrawalQueue.length) revert IndexOutOfBounds();
         if (index <= lastFinalizedIndex) revert CanOnlyFinalizeForward();
 
-
         uint256 hypeAmountToFinalize = 0;
         uint256 beHypeAmountToFinalize = 0;
         for (uint256 i = lastFinalizedIndex + 1; i <= index;) {
-            stakingCore.sendFromWithdrawManager(withdrawalQueue[i].hypeAmount, withdrawalQueue[i].user);
             beHypeAmountToFinalize += withdrawalQueue[i].beHypeAmount;
             hypeAmountToFinalize += withdrawalQueue[i].hypeAmount;
-            withdrawalQueue[i].finalized = true;
 
             unchecked { ++i; }
         }
-
         lastFinalizedIndex = index;
+
         beHypeToken.burn(address(this), beHypeAmountToFinalize);
+        stakingCore.sendFromWithdrawManager(hypeAmountToFinalize, address(this));
         hypeRequestedForWithdraw -= hypeAmountToFinalize;
 
         emit WithdrawalsBatchFinalized(index);
@@ -180,11 +192,13 @@ contract WithdrawManager is
         // max capacity = max(uint64) * 1e12 ~= 16 * 1e18 * 1e12 = 16 * 1e12 HYPE, which is practically enough
         uint64 bucketUnit = _convertToBucketUnit(capacity, Math.Rounding.Floor);
         BucketLimiter.setCapacity(instantWithdrawalLimit, bucketUnit);
+        emit InstantWithdrawalCapacityUpdated(capacity);
     }
 
     function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         BucketLimiter.setRefillRate(instantWithdrawalLimit, refillRate);
+        emit InstantWithdrawalRefillRateUpdated(refillRate);
     }
 
     function pauseWithdrawals() external {
@@ -202,24 +216,32 @@ contract WithdrawManager is
     function getWithdrawalQueue(uint256 index) external view returns (WithdrawalEntry memory) {
         return withdrawalQueue[index];
     }
+
+    function canClaimWithdrawal(uint256 withdrawalId) public view returns (bool) {
+        if (withdrawalId >= withdrawalQueue.length) return false;
+        if (withdrawalId > lastFinalizedIndex) return false;
+        
+        WithdrawalEntry storage entry = withdrawalQueue[withdrawalId];
+        return !entry.claimed;
+    }
     
-    function getUserUnFinalizedWithdrawals(address user) external view returns (uint256[] memory) {
-        uint256[] memory unFinalizedWithdrawals = new uint256[](userWithdrawals[user].length);
+    function getUserUnclaimedWithdrawals(address user) external view returns (uint256[] memory) {
+        uint256[] memory unclaimedWithdrawals = new uint256[](userWithdrawals[user].length);
         uint256 count = 0;
         for (uint256 i = 0; i < userWithdrawals[user].length;) {
             WithdrawalEntry storage entry = withdrawalQueue[userWithdrawals[user][i]];
-            if (!entry.finalized) {
-                unFinalizedWithdrawals[count] = userWithdrawals[user][i];
+            if (!entry.claimed) {
+                unclaimedWithdrawals[count] = userWithdrawals[user][i];
                 unchecked { ++count; }
             }
             unchecked { ++i; }
         }
 
         assembly {
-            mstore(unFinalizedWithdrawals, count)
+            mstore(unclaimedWithdrawals, count)
         }
 
-        return unFinalizedWithdrawals;
+        return unclaimedWithdrawals;
     }
 
     /**

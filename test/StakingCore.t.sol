@@ -18,6 +18,7 @@ contract StakingCoreTest is BaseTest {
 
         vm.prank(admin);
         vm.warp(block.timestamp + 1 days);
+        vm.roll(block.number + 5);
         stakingCore.updateExchangeRatio();
 
         assertEq(stakingCore.exchangeRatio(), 1 ether);
@@ -29,6 +30,7 @@ contract StakingCoreTest is BaseTest {
         // 1% APR
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 0.01 ether, 0, 0);
         vm.warp(block.timestamp + 365 days);
+        vm.roll(block.number + 5);
 
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
@@ -117,6 +119,53 @@ contract StakingCoreTest is BaseTest {
             true,
             12 hours
         );
+    }
+    
+    function test_depositToHyperCore_should_revert_with_various_precision_loss_scenarios() public {
+        test_stake();
+        
+        uint256[] memory problematicAmounts = new uint256[](3);
+        problematicAmounts[0] = 1 ether + 1;
+        problematicAmounts[1] = 1 ether + 1000;
+        problematicAmounts[2] = 1 ether + 1e9;
+
+        for (uint256 i = 0; i < problematicAmounts.length; i++) {
+            uint256 amount = problematicAmounts[i];
+            uint256 expectedTruncated = amount / 1e10 * 1e10;
+            
+            vm.prank(admin);
+            vm.expectRevert(abi.encodeWithSelector(
+                IStakingCore.PrecisionLossDetected.selector, 
+                amount, 
+                expectedTruncated
+            ));
+            stakingCore.depositToHyperCore(amount);
+        }
+    }
+
+    function test_ExchangeRatioUpdateGuard() public {
+        test_stake();
+        vm.warp(block.timestamp + 1 days);
+
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 1 ether);
+        withdrawManager.withdraw(1 ether, false);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        stakingCore.depositToHyperCore(0.000001 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IStakingCore.ExchangeRatioUpdateTooSoon.selector, 5, 0));
+        stakingCore.updateExchangeRatio();
+
+        stakingCore.withdrawFromHyperCore(0.000001 ether);
+
+        vm.roll(block.number + 4);
+        vm.expectRevert(abi.encodeWithSelector(IStakingCore.ExchangeRatioUpdateTooSoon.selector, 5, 4));
+        stakingCore.updateExchangeRatio();
+
+        vm.roll(block.number + 5);
+        stakingCore.updateExchangeRatio();
     }
 
     function test_WithdrawFromStakingCooldown() public {

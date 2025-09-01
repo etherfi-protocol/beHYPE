@@ -24,7 +24,9 @@ interface IStakingCore {
     error FailedToSendFromWithdrawManager();
     error WithdrawalCooldownNotMet();
     error ExceedsLimit();
-    
+    error PrecisionLossDetected(uint256 amount, uint256 truncatedAmount);
+    error ExchangeRatioUpdateTooSoon(uint256 blocksRequired, uint256 blocksPassed);
+
     /* ========== EVENTS ========== */
 
     /**
@@ -87,6 +89,17 @@ interface IStakingCore {
      */
     event WithdrawalCooldownPeriodUpdated(uint256 withdrawalCooldownPeriod);
 
+     * @notice Emitted when the acceptable APR is updated
+     * @param newAprInBps The new acceptable APR in basis points
+     */
+    event AcceptableAprUpdated(uint16 newAprInBps);
+
+    /**
+     * @notice Emitted when the exchange rate guard is updated
+     * @param newExchangeRateGuard The new exchange rate guard value
+     */
+    event ExchangeRateGuardUpdated(bool newExchangeRateGuard);
+
     /* ========== MAIN FUNCTIONS ========== */
 
     /**
@@ -108,7 +121,6 @@ interface IStakingCore {
     /**
      * @notice Allows the withdraw manager to send HYPE to the user
      * @param amount The amount of HYPE to send
-     * @param to The address to send the HYPE to
      * @dev Only callable by the withdraw manager
      */
     function sendFromWithdrawManager(uint256 amount, address to) external;
@@ -203,12 +215,12 @@ interface IStakingCore {
     /* ========== VIEW FUNCTIONS ========== */
 
     /**
-     * @notice Converts kHYPE amount to HYPE using current exchange ratio
-     * @param kHYPEAmount The amount of kHYPE tokens to convert
+     * @notice Converts beHYPE amount to HYPE using current exchange ratio
+     * @param beHYPEAmount The amount of beHYPE tokens to convert
      * @return The equivalent amount of HYPE tokens
      * @dev Uses current exchange ratio for conversion
      */
-    function BeHYPEToHYPE(uint256 kHYPEAmount) external view returns (uint256);
+    function BeHYPEToHYPE(uint256 beHYPEAmount) external view returns (uint256);
 
     /**
      * @notice Converts HYPE amount to kHYPE using current exchange ratio
