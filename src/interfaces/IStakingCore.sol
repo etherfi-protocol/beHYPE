@@ -191,6 +191,16 @@ interface IStakingCore {
     function withdrawFromStaking(uint256 amount) external;
 
     /**
+     * @notice Emergency withdrawal of HYPE from staking via CoreWriter Action 5
+     * @param amount The amount of HYPE to withdraw in wei
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @dev Bypasses cooldown and pending withdrawal restrictions
+     * @dev Sends Action 5 to CoreWriter for HyperCore processing
+     * @dev Emits StakingWithdraw event
+     */
+    function emergencyWithdrawFromStaking(uint256 amount) external;
+
+    /**
      * @notice Delegates or undelegates tokens via CoreWriter Action 3
      * @param validator The validator address to delegate/undelegate from
      * @param amount The amount of tokens to delegate/undelegate in wei

@@ -191,6 +191,13 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit HyperCoreStakingWithdraw(amount);
     }
 
+    function emergencyWithdrawFromStaking(uint256 amount) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        
+        _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
+        emit HyperCoreStakingWithdraw(amount);
+    }
+
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
         
