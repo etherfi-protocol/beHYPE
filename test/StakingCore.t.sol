@@ -149,7 +149,7 @@ contract StakingCoreTest is BaseTest {
 
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 1 ether);
         vm.stopPrank();
 
         vm.startPrank(admin);
@@ -177,7 +177,7 @@ contract StakingCoreTest is BaseTest {
         
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 50 ether);
-        withdrawManager.withdraw(20 ether, false);
+        withdrawManager.withdraw(20 ether, false, 1 ether);
         vm.stopPrank();
         
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);

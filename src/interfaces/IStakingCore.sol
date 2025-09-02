@@ -89,6 +89,7 @@ interface IStakingCore {
      */
     event WithdrawalCooldownPeriodUpdated(uint256 withdrawalCooldownPeriod);
 
+    /**
      * @notice Emitted when the acceptable APR is updated
      * @param newAprInBps The new acceptable APR in basis points
      */
