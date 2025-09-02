@@ -53,7 +53,7 @@ contract RoleRegistryTest is BaseTest {
         stakingCore.stake("test");
         
         vm.expectRevert(IWithdrawManager.WithdrawalsPaused.selector);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
     }
 
     function test_pauseProtocol_revertIfNotPauser() public {
@@ -79,7 +79,7 @@ contract RoleRegistryTest is BaseTest {
         vm.startPrank(user);
         stakingCore.stake{value: 1 ether}("test");
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
     }
 
     function test_unpauseProtocol_revertIfNotUnpauser() public {
@@ -111,7 +111,7 @@ contract RoleRegistryTest is BaseTest {
         beHYPE.approve(address(withdrawManager), 1 ether);
         vm.expectRevert(IWithdrawManager.WithdrawalsPaused.selector);
         vm.prank(user);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
         
         vm.prank(guardian);
         roleRegistry.unpauseProtocol();
@@ -122,7 +122,7 @@ contract RoleRegistryTest is BaseTest {
         vm.startPrank(user);
         stakingCore.stake{value: 1 ether}("test");
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0.9 ether);
     }
 
     function test_RevertUpgradeUnauthorized() public {
