@@ -201,4 +201,40 @@ contract StakingCoreTest is BaseTest {
         stakingCore.withdrawFromStaking(5 ether);
     }
 
+    function test_emergencyWithdrawFromStaking() public {
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+
+        vm.warp(block.timestamp + 12 hours);
+        
+        vm.startPrank(user);
+        beHYPE.approve(address(withdrawManager), 50 ether);
+        withdrawManager.withdraw(20 ether, false, 1 ether);
+        vm.stopPrank();
+        
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);
+        
+        vm.prank(admin);
+        stakingCore.withdrawFromStaking(10 ether);
+        
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.WithdrawalCooldownNotMet.selector);
+        stakingCore.withdrawFromStaking(5 ether);
+        
+        vm.prank(admin);
+        stakingCore.emergencyWithdrawFromStaking(5 ether);
+
+        vm.prank(admin);
+        vm.expectRevert(IStakingCore.ExceedsLimit.selector);
+        stakingCore.withdrawFromStaking(100 ether);
+
+        vm.prank(admin);
+        stakingCore.emergencyWithdrawFromStaking(100 ether);
+        
+        vm.prank(user);
+        vm.expectRevert(IStakingCore.NotAuthorized.selector);
+        stakingCore.emergencyWithdrawFromStaking(1 ether);
+    }
+
 }
