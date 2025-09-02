@@ -73,7 +73,7 @@ interface IStakingCore {
      * @notice Emitted when HYPE is delegated or undelegated
      * @param validator The validator address
      * @param amount The amount of HYPE delegated/undelegated
-     * @param isUndelegate True if undelegating, false if delegating 22
+     * @param isUndelegate True if undelegating, false if delegating
      */
     event TokenDelegated(address validator, uint256 amount, bool isUndelegate);
 
