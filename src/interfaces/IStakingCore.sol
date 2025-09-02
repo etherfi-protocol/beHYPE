@@ -89,6 +89,7 @@ interface IStakingCore {
      */
     event WithdrawalCooldownPeriodUpdated(uint256 withdrawalCooldownPeriod);
 
+    /**
      * @notice Emitted when the acceptable APR is updated
      * @param newAprInBps The new acceptable APR in basis points
      */
@@ -99,6 +100,18 @@ interface IStakingCore {
      * @param newExchangeRateGuard The new exchange rate guard value
      */
     event ExchangeRateGuardUpdated(bool newExchangeRateGuard);
+
+    /**
+     * @notice Emitted when an emergency withdrawal is performed
+     * @param amount The amount of HYPE withdrawn in emergency
+     */
+    event EmergencyStakingWithdraw(uint256 amount);
+
+    /**
+     * @notice Emitted when an emergency HyperCore withdrawal is performed
+     * @param amount The amount of HYPE withdrawn from HyperCore in emergency
+     */
+    event EmergencyHyperCoreWithdraw(uint256 amount);
 
     /* ========== MAIN FUNCTIONS ========== */
 
@@ -199,6 +212,27 @@ interface IStakingCore {
      * @dev Emits TokenDelegated event
      */
     function delegateTokens(address validator, uint256 amount, bool isUndelegate) external;
+
+    /**
+     * @notice Emergency withdrawal from staking that bypasses withdrawal restrictions
+     * @param amount The amount of HYPE to withdraw in wei
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @dev Bypasses the hypeRequestedForWithdraw restriction for emergency situations
+     * @dev Still respects withdrawal cooldown period
+     * @dev Sends Action 5 to CoreWriter for HyperCore processing
+     * @dev Emits EmergencyWithdraw event
+     */
+    function emergencyWithdrawFromStaking(uint256 amount) external;
+
+    /**
+     * @notice Emergency withdrawal from HyperCore that bypasses withdrawal restrictions
+     * @param amount The amount of HYPE to withdraw in wei
+     * @dev Only callable by accounts with PROTOCOL_GUARDIAN role
+     * @dev Bypasses withdrawal cooldown period for emergency situations
+     * @dev Sends Action 6 to CoreWriter for HyperCore processing
+     * @dev Emits EmergencyHyperCoreWithdraw event
+     */
+    function emergencyWithdrawFromHyperCore(uint256 amount) external;
 
     /**
      * @notice Pauses staking

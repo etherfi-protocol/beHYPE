@@ -149,7 +149,7 @@ contract StakingCoreTest is BaseTest {
 
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 1 ether);
-        withdrawManager.withdraw(1 ether, false);
+        withdrawManager.withdraw(1 ether, false, 0);
         vm.stopPrank();
 
         vm.startPrank(admin);
@@ -177,7 +177,7 @@ contract StakingCoreTest is BaseTest {
         
         vm.startPrank(user);
         beHYPE.approve(address(withdrawManager), 50 ether);
-        withdrawManager.withdraw(20 ether, false);
+        withdrawManager.withdraw(20 ether, false, 0);
         vm.stopPrank();
         
         assertEq(withdrawManager.hypeRequestedForWithdraw(), 20 ether);
@@ -199,6 +199,38 @@ contract StakingCoreTest is BaseTest {
         vm.warp(lastWithdrawalTime + 12 hours);
         vm.prank(admin);
         stakingCore.withdrawFromStaking(5 ether);
+    }
+
+    function test_EmergencyWithdrawals() public {
+        vm.deal(user, 100 ether);
+        vm.prank(user);
+        stakingCore.stake{value: 89 ether}("");
+
+        assertEq(withdrawManager.hypeRequestedForWithdraw(), 0);
+        
+        vm.prank(user);
+        vm.expectRevert(IStakingCore.NotAuthorized.selector);
+        stakingCore.emergencyWithdrawFromStaking(10 ether);
+        
+        vm.prank(user);
+        vm.expectRevert(IStakingCore.NotAuthorized.selector);
+        stakingCore.emergencyWithdrawFromHyperCore(10 ether);
+        
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit IStakingCore.EmergencyStakingWithdraw(10 ether);
+        stakingCore.emergencyWithdrawFromStaking(10 ether);
+        
+        vm.prank(admin);
+        stakingCore.emergencyWithdrawFromStaking(5 ether);
+        
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit IStakingCore.EmergencyHyperCoreWithdraw(10 ether);
+        stakingCore.emergencyWithdrawFromHyperCore(10 ether);
+        
+        vm.prank(admin);
+        stakingCore.emergencyWithdrawFromHyperCore(5 ether);
     }
 
 }

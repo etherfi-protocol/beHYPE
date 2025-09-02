@@ -91,6 +91,7 @@ contract WithdrawManagerTest is BaseTest {
 
         DelegatorSummaryMock(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS).setDelegatorSummary(address(stakingCore), 100 ether, 0, 0);
         vm.warp(block.timestamp + (365 days * 100));
+        vm.roll(block.number + 5);
         vm.prank(admin);
         stakingCore.updateExchangeRatio();
         assertEq(stakingCore.BeHYPEToHYPE(1 ether), 2 ether);

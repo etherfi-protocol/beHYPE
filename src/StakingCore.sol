@@ -198,6 +198,20 @@ contract StakingCore is IStakingCore, Initializable, UUPSUpgradeable, PausableUp
         emit TokenDelegated(validator, amount, isUndelegate);
     }
 
+    function emergencyWithdrawFromStaking(uint256 amount) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        
+        _encodeAction(5, abi.encode(_convertTo8Decimals(amount)));
+        emit EmergencyStakingWithdraw(amount);
+    }
+
+    function emergencyWithdrawFromHyperCore(uint256 amount) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert NotAuthorized();
+        
+        _encodeAction(6, abi.encode(L1_HYPE_CONTRACT, HYPE_TOKEN_ID, _convertTo8Decimals(amount)));
+        emit EmergencyHyperCoreWithdraw(amount);
+    }
+
     function pauseStaking() external {
         if (msg.sender != address(roleRegistry)) revert NotAuthorized();
         _pause();
