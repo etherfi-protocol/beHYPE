@@ -65,7 +65,7 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         emit WithdrawManagerUpdated(withdrawManager);
     }
 
-    function setFinalizerUser(address _finalizerUser) external {
+    function setFinalizer(address _finalizerUser) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert Unauthorized();
         
         bytes32 slot = HYPERCORE_DEPLOYER;
@@ -76,7 +76,7 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         emit FinalizerUserUpdated(_finalizerUser);
     }
 
-    function getFinalizerUser() external view returns (address) {
+    function getFinalizer() external view returns (address) {
         address finalizerUser;
         bytes32 slot = HYPERCORE_DEPLOYER;
         assembly {

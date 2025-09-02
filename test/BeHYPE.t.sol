@@ -210,18 +210,18 @@ contract BeHYPETest is BaseTest {
     function test_FinalizerUser() public {
         address finalizerUser = makeAddr("finalizer");
         
-        assertEq(beHYPE.getFinalizerUser(), address(0));
+        assertEq(beHYPE.getFinalizer(), address(0));
         
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(IBeHYPEToken.Unauthorized.selector));
-        beHYPE.setFinalizerUser(finalizerUser);
+        beHYPE.setFinalizer(finalizerUser);
         
         vm.prank(admin);
         vm.expectEmit(true, false, false, true);
         emit FinalizerUserUpdated(finalizerUser);
-        beHYPE.setFinalizerUser(finalizerUser);
+        beHYPE.setFinalizer(finalizerUser);
         
-        assertEq(beHYPE.getFinalizerUser(), finalizerUser);
+        assertEq(beHYPE.getFinalizer(), finalizerUser);
         
         bytes32 slot = keccak256("HyperCore deployer");
         bytes32 storedValue = vm.load(address(beHYPE), slot);
