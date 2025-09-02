@@ -13,6 +13,11 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
     address public stakingCore;
     IRoleRegistry public roleRegistry;
     address public withdrawManager;
+    
+    /* ========== CONSTANTS ========== */
+    
+    /// @dev Storage slot for finalizer user address using keccak256("HyperCore deployer")
+    bytes32 public constant FINALIZER_USER_SLOT = keccak256("HyperCore deployer");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -58,6 +63,26 @@ contract BeHYPE is IBeHYPEToken, ERC20PermitUpgradeable, UUPSUpgradeable {
         withdrawManager = _withdrawManager;
 
         emit WithdrawManagerUpdated(withdrawManager);
+    }
+
+    function setFinalizerUser(address _finalizerUser) external {
+        if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_GUARDIAN(), msg.sender)) revert Unauthorized();
+        
+        bytes32 slot = FINALIZER_USER_SLOT;
+        assembly {
+            sstore(slot, _finalizerUser)
+        }
+        
+        emit FinalizerUserUpdated(_finalizerUser);
+    }
+
+    function getFinalizerUser() external view returns (address) {
+        address finalizerUser;
+        bytes32 slot = FINALIZER_USER_SLOT;
+        assembly {
+            finalizerUser := sload(slot)
+        }
+        return finalizerUser;
     }
 
     function _authorizeUpgrade(

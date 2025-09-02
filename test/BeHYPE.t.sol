@@ -13,6 +13,7 @@ contract BeHYPETest is BaseTest {
     // Events
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+    event FinalizerUserUpdated(address finalizerUser);
 
     function setUp() public override {
         super.setUp();
@@ -204,6 +205,27 @@ contract BeHYPETest is BaseTest {
             address(stakingCore),
             address(withdrawManager)
         );
+    }
+
+    function test_FinalizerUser() public {
+        address finalizerUser = makeAddr("finalizer");
+        
+        assertEq(beHYPE.getFinalizerUser(), address(0));
+        
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(IBeHYPEToken.Unauthorized.selector));
+        beHYPE.setFinalizerUser(finalizerUser);
+        
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, true);
+        emit FinalizerUserUpdated(finalizerUser);
+        beHYPE.setFinalizerUser(finalizerUser);
+        
+        assertEq(beHYPE.getFinalizerUser(), finalizerUser);
+        
+        bytes32 slot = keccak256("HyperCore deployer");
+        bytes32 storedValue = vm.load(address(beHYPE), slot);
+        assertEq(address(uint160(uint256(storedValue))), finalizerUser);
     }
 
 }
