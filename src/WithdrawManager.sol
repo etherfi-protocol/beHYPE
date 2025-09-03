@@ -64,7 +64,7 @@ contract WithdrawManager is
         address _beHypeToken,
         address _stakingCore,
         uint256 _bucketCapacity,
-        uint64 _bucketRefillRate
+        uint256 _bucketRefillRate
     ) public initializer {
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -80,7 +80,7 @@ contract WithdrawManager is
 
         instantWithdrawalLimit = BucketLimiter.create(
             _convertToBucketUnit(_bucketCapacity, Math.Rounding.Floor), 
-            _bucketRefillRate
+            _convertToBucketUnit(_bucketRefillRate, Math.Rounding.Floor)
         );
 
         withdrawalQueue.push(WithdrawalEntry({
@@ -195,9 +195,11 @@ contract WithdrawManager is
         emit InstantWithdrawalCapacityUpdated(capacity);
     }
 
-    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external {
+    function setInstantWithdrawalRefillRatePerSecond(uint256 refillRate) external {
         if (!roleRegistry.hasRole(roleRegistry.PROTOCOL_ADMIN(), msg.sender)) revert NotAuthorized();
-        BucketLimiter.setRefillRate(instantWithdrawalLimit, refillRate);
+        
+        uint64 bucketUnit = _convertToBucketUnit(refillRate, Math.Rounding.Floor);
+        BucketLimiter.setRefillRate(instantWithdrawalLimit, bucketUnit);
         emit InstantWithdrawalRefillRateUpdated(refillRate);
     }
 

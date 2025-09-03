@@ -98,7 +98,7 @@ contract BaseTest is Test {
                 address(beHYPE),
                 address(stakingCore),
                 10 ether,
-                1 days
+                0.1 ether
             )
         ))));
 

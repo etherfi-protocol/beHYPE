@@ -68,7 +68,7 @@ interface IWithdrawManager {
     
     event InstantWithdrawalCapacityUpdated(uint256 capacity);
     
-    event InstantWithdrawalRefillRateUpdated(uint64 refillRate);
+    event InstantWithdrawalRefillRateUpdated(uint256 refillRate);
     
     /* ========== MAIN FUNCTIONS ========== */
     
@@ -155,6 +155,6 @@ interface IWithdrawManager {
      * @param refillRate The new instant withdrawal refill rate per second
      * @dev Only callable by the protocol admin
      */
-    function setInstantWithdrawalRefillRatePerSecond(uint64 refillRate) external;
+    function setInstantWithdrawalRefillRatePerSecond(uint256 refillRate) external;
     
 }
