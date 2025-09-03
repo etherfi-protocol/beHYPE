@@ -1,11 +1,18 @@
 {
-  "deployment": {
-    "saltShift": 2000
+  "addresses": {
+    "BeHYPE": "0x3Ae58a3C54ee21934Ef95A0bae21Dd8123dDCFF9",
+    "WithdrawManager": "0xd25782FAef94365a95593B91e1c2fdEa1fB1eb1a",
+    "StakingCore": "0xEB198B94326B37e3D23E74F5E66857617b271400",
+    "RoleRegistry": "0x477A908d4b52A5f4f2BF79301Fed57170c49C3Ae",
+    "BeHYPETimelock": "0xc94459d792E5815a2A13d17a3a556f2800b3391B",
+    "L1Read": "0xb7467E0524Afba7006957701d1F06A59000d15A2",
+    "Create3Deployer": "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
   },
   "roles": {
     "admin": "0xdc06023b80e588f1121A901eFC3a0126f7191692",
     "guardian": "0xdc06023b80e588f1121A901eFC3a0126f7191692",
-    "protocolTreasury": "0xdc06023b80e588f1121A901eFC3a0126f7191692"
+    "protocolTreasury": "0xc4bdD45Ff1229146c2c1dc585E66aEb6677cbbf3",
+    "pauser": "0xdc06023b80e588f1121A901eFC3a0126f7191692"
   },
   "token": {
     "name": "hyperbeat x ether.fi HYPE",
@@ -22,10 +29,9 @@
     "lowWatermarkInBpsOfTvl": 100,
     "instantWithdrawalFeeInBps": 30,
     "bucketCapacity": "100000000000000000000000",
-    "bucketRefillRate": "1000000"
+    "bucketRefillRate": "1000000000000000000"
   },
   "timelock": {
     "minDelay": 1800
-  },
-  "deployed": {}
+  }
 }

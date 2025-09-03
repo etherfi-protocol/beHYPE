@@ -10,6 +10,7 @@ import "../src/RoleRegistry.sol";
 import "../src/StakingCore.sol";
 import "../src/WithdrawManager.sol";
 import "../src/BeHYPETimelock.sol";
+import "../src/interfaces/ICreate3Deployer.sol";
 
 contract DeployCore is Script {
     using stdJson for string;
@@ -29,6 +30,9 @@ contract DeployCore is Script {
 
     string public config;
     string public configPath;
+    
+    
+    ICreate3Deployer public create3Deployer;
 
     /*
     * forge script script/Deploy.s.sol:DeployCore \
@@ -38,14 +42,14 @@ contract DeployCore is Script {
     * --broadcast \
     * --verify \
     * --etherscan-api-key $ETH_ETHERSCAN_KEY \
-    * --sig "run(string)" $CONFIG_PATH
+    * --sig "run(bool)" true
     */
-    function run(string memory _configPath) external {
-        // Store config path
-        configPath = _configPath;
+    function run(bool _isMainnet) external {
+        configPath = _isMainnet ? "config/production.json" : "config/testnet.json";
 
-        // Load configuration
         config = vm.readFile(configPath);
+        
+        create3Deployer = ICreate3Deployer(config.readAddress(".addresses.Create3Deployer"));
 
         vm.startBroadcast();
 
@@ -57,123 +61,127 @@ contract DeployCore is Script {
 
         _logDeployments();
     }
+    
 
-    function _deployProxy(string memory configKey, address implementation, bytes memory initData) private returns (UUPSProxy proxy) {
-        // Read base salt and shift value
-        uint256 saltShift = config.readUint(".deployment.saltShift");
 
-        // Create unique salt for each proxy by hashing configKey and shifting
-        bytes32 salt = bytes32(uint256(keccak256(bytes(configKey))) + saltShift);
-
-        proxy = new UUPSProxy{salt: salt}(
-            address(implementation),
-            initData
+    function _deployProxy(string memory contractName, address implementation, bytes memory initData) private returns (UUPSProxy proxy) {
+        
+        address deployedAddress = create3Deployer.deployCreate3(
+            keccak256(bytes(contractName)),
+            abi.encodePacked(
+                type(UUPSProxy).creationCode,
+                abi.encode(address(implementation), initData)
+            )
         );
         
-        // Write the address to config
-        vm.writeJson(vm.toString(address(proxy)), configPath, string.concat(".deployed.", configKey));
+        address expectedAddress = config.readAddress(string.concat(".addresses.", contractName));
+        if (deployedAddress != expectedAddress) {
+            revert(string(abi.encodePacked(
+                "Address mismatch for ", contractName, 
+                ": expected ", vm.toString(expectedAddress), 
+                ", got ", vm.toString(deployedAddress)
+            )));
+        }
+        
+        proxy = UUPSProxy(payable(deployedAddress));
     }
 
     function _deployProxies() private {
-        // Deploy implementations first
         RoleRegistry roleRegistryImpl = new RoleRegistry();
         BeHYPE beHYPEImpl = new BeHYPE();
         StakingCore stakingCoreImpl = new StakingCore();
         WithdrawManager withdrawManagerImpl = new WithdrawManager();
 
-        // Deploy proxies with initialization data
-        roleRegistryProxy = _deployProxy("roleRegistryProxy", address(roleRegistryImpl), 
+        roleRegistryProxy = _deployProxy("RoleRegistry", address(roleRegistryImpl), 
             abi.encodeWithSelector(
                 RoleRegistry.initialize.selector,
-                config.readAddress(".roles.admin"),
-                address(0), // Will be updated after withdrawManager is deployed
-                address(0), // Will be updated after stakingCore is deployed
+                msg.sender, // start as the deployer for setting the initial roles
+                config.readAddress(".addresses.WithdrawManager"),
+                config.readAddress(".addresses.StakingCore"),
                 config.readAddress(".roles.protocolTreasury")
             )
         );
 
-        beHYPEProxy = _deployProxy("beHYPEProxy", address(beHYPEImpl),
+        beHYPEProxy = _deployProxy("BeHYPE", address(beHYPEImpl),
             abi.encodeWithSelector(
                 BeHYPE.initialize.selector,
                 config.readString(".token.name"),
                 config.readString(".token.symbol"),
-                address(roleRegistryProxy),
-                address(0), // Will be updated after stakingCore is deployed
-                address(0)  // Will be updated after withdrawManager is deployed
+                config.readAddress(".addresses.RoleRegistry"),
+                config.readAddress(".addresses.StakingCore"),
+                config.readAddress(".addresses.WithdrawManager")
             )
         );
 
-        stakingCoreProxy = _deployProxy("stakingCoreProxy", address(stakingCoreImpl),
+        stakingCoreProxy = _deployProxy("StakingCore", address(stakingCoreImpl),
             abi.encodeWithSelector(
                 StakingCore.initialize.selector,
-                address(roleRegistryProxy),
-                address(beHYPEProxy),
-                address(0), // Will be updated after withdrawManager is deployed
+                config.readAddress(".addresses.RoleRegistry"),
+                config.readAddress(".addresses.BeHYPE"),
+                config.readAddress(".addresses.WithdrawManager"),
                 config.readUint(".staking.acceptableAprInBps"),
                 config.readBool(".staking.exchangeRateGuard"),
                 config.readUint(".staking.withdrawalCooldownPeriod")
             )
         );
 
-        withdrawManagerProxy = _deployProxy("withdrawManagerProxy", address(withdrawManagerImpl),
+        withdrawManagerProxy = _deployProxy("WithdrawManager", address(withdrawManagerImpl),
             abi.encodeWithSelector(
                 WithdrawManager.initialize.selector,
                 config.readUint(".withdrawals.minWithdrawalAmount"),
                 config.readUint(".withdrawals.maxWithdrawalAmount"),
                 config.readUint(".withdrawals.lowWatermarkInBpsOfTvl"),
                 config.readUint(".withdrawals.instantWithdrawalFeeInBps"),
-                address(roleRegistryProxy),
-                address(beHYPEProxy),
-                address(stakingCoreProxy),
+                config.readAddress(".addresses.RoleRegistry"),
+                config.readAddress(".addresses.BeHYPE"),
+                config.readAddress(".addresses.StakingCore"),
                 config.readUint(".withdrawals.bucketCapacity"),
                 config.readUint(".withdrawals.bucketRefillRate")
             )
         );
     }
 
-
-
     function _deployTimelock() private {
-        // Deploy timelock directly (no proxy needed)
         address[] memory proposers = new address[](1);
-        proposers[0] = config.readAddress(".roles.admin");
+        proposers[0] = config.readAddress(".roles.guardian");
         
         address[] memory executors = new address[](1);
-        executors[0] = config.readAddress(".roles.admin");
-
-        timelock = new BeHYPETimelock(
-            config.readUint(".timelock.minDelay"),
-            proposers,
-            executors,
-            config.readAddress(".roles.admin")
+        executors[0] = config.readAddress(".roles.guardian");
+        
+        address deployedAddress = create3Deployer.deployCreate3(
+            keccak256(bytes(string("BeHYPETimelock"))),
+            abi.encodePacked(
+                type(BeHYPETimelock).creationCode,
+                abi.encode(
+                    config.readUint(".timelock.minDelay"),
+                    proposers,
+                    executors,
+                    address(0) // admin of the timelock is the timelock itself
+                )
+            )
         );
-
-        // Write timelock address to config
-        vm.writeJson(vm.toString(address(timelock)), configPath, ".deployed.timelock");
+        
+        address expectedAddress = config.readAddress(".addresses.BeHYPETimelock");
+        if (deployedAddress != expectedAddress) {
+            revert(string(abi.encodePacked(
+                "Address mismatch for BeHYPETimelock", 
+                ": expected ", vm.toString(expectedAddress), 
+                ", got ", vm.toString(deployedAddress)
+            )));
+        }
+        
+        timelock = BeHYPETimelock(payable(deployedAddress));
     }
 
     function _setupInitialRoles() private {
-        // Cast proxies to contract interfaces
         roleRegistry = RoleRegistry(address(roleRegistryProxy));
-        beHYPE = BeHYPE(address(beHYPEProxy));
-        stakingCore = StakingCore(payable(address(stakingCoreProxy)));
-        withdrawManager = WithdrawManager(payable(address(withdrawManagerProxy)));
 
-        // Update role registry with actual contract addresses
-        roleRegistry.setWithdrawManager(address(withdrawManagerProxy));
-        roleRegistry.setStakingCore(address(stakingCoreProxy));
-
-        // Grant initial roles
         roleRegistry.grantRole(roleRegistry.PROTOCOL_ADMIN(), config.readAddress(".roles.admin"));
         roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), config.readAddress(".roles.guardian"));
         roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), config.readAddress(".roles.admin"));
+        roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), config.readAddress(".roles.pauser"));
 
-        // Update BeHYPE with actual contract addresses
-        beHYPE.setStakingCore(address(stakingCoreProxy));
-        beHYPE.setWithdrawManager(address(withdrawManagerProxy));
-
-        // Update StakingCore with actual withdraw manager address
-        stakingCore.setWithdrawManager(address(withdrawManagerProxy));
+        roleRegistry.transferOwnership(config.readAddress(".addresses.BeHYPETimelock"));
     }
 
     function _logDeployments() private view {
@@ -204,7 +212,7 @@ contract DeployCore is Script {
         console.log("Low Watermark:", config.readUint(".withdrawals.lowWatermarkInBpsOfTvl"), "bps");
         console.log("Instant Withdrawal Fee:", config.readUint(".withdrawals.instantWithdrawalFeeInBps"), "bps");
         console.log("Bucket Capacity:", config.readUint(".withdrawals.bucketCapacity"), "wei");
-        console.log("Bucket Refill Rate:", config.readUint(".withdrawals.bucketRefillRate"), "per second");
+        console.log("Bucket Refill Rate:", config.readUint(".withdrawals.bucketRefillRate"), "wei per second");
 
         console.log("\n=== Timelock Configuration ===");
         console.log("Min Delay:", config.readUint(".timelock.minDelay"), "seconds");
