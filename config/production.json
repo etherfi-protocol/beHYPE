@@ -1,0 +1,31 @@
+{
+  "deployment": {
+    "saltShift": 1000
+  },
+  "roles": {
+    "admin": "0xb700d555DDcB806634617f861f01fE8F47aA33Ef",
+    "guardian": "0xf27128a5b064e8d97EDaa60D24bFa2FD1eeC26eB",
+    "protocolTreasury": "0xf27128a5b064e8d97EDaa60D24bFa2FD1eeC26eB"
+  },
+  "token": {
+    "name": "hyperbeat x ether.fi HYPE",
+    "symbol": "beHYPE"
+  },
+  "staking": {
+    "acceptableAprInBps": 500,
+    "exchangeRateGuard": true,
+    "withdrawalCooldownPeriod": 43200
+  },
+  "withdrawals": {
+    "minWithdrawalAmount": "100000000000000000",
+    "maxWithdrawalAmount": "100000000000000000000000",
+    "lowWatermarkInBpsOfTvl": 100,
+    "instantWithdrawalFeeInBps": 30,
+    "bucketCapacity": "10000000000000000000000",
+    "bucketRefillRate": "1000000"
+  },
+  "timelock": {
+    "minDelay": 1800
+  },
+  "deployed": {}
+}
