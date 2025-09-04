@@ -81,7 +81,8 @@ contract BaseTest is Test {
                 address(beHYPE),
                 address(withdrawManager),
                 400,
-                true
+                true,
+                12 hours
             )
         ))));
 
@@ -97,7 +98,7 @@ contract BaseTest is Test {
                 address(beHYPE),
                 address(stakingCore),
                 10 ether,
-                1 days
+                0.1 ether
             )
         ))));
 
