@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
