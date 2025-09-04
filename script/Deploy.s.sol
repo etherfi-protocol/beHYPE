@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
@@ -10,9 +10,9 @@ import "../src/RoleRegistry.sol";
 import "../src/StakingCore.sol";
 import "../src/WithdrawManager.sol";
 import "../src/BeHYPETimelock.sol";
-import "../src/interfaces/ICreate3Deployer.sol";
+import "./utils/Utils.sol";
 
-contract DeployCore is Script {
+contract DeployCore is Script, Utils {
     using stdJson for string;
 
     // Contract instances
@@ -30,9 +30,6 @@ contract DeployCore is Script {
 
     string public config;
     string public configPath;
-    
-    
-    ICreate3Deployer public create3Deployer;
 
     /*
     * forge script script/Deploy.s.sol:DeployCore \
@@ -41,37 +38,28 @@ contract DeployCore is Script {
     * --sender 0xd8F3803d8412e61e04F53e1C9394e13eC8b32550 \
     * --broadcast \
     * --verify \
-    * --etherscan-api-key $ETH_ETHERSCAN_KEY \
     * --sig "run(bool)" true
     */
     function run(bool _isMainnet) external {
         configPath = _isMainnet ? "config/production.json" : "config/testnet.json";
 
         config = vm.readFile(configPath);
-        
-        create3Deployer = ICreate3Deployer(config.readAddress(".addresses.Create3Deployer"));
 
         vm.startBroadcast();
 
         _deployProxies();
-
         _deployTimelock();
-
         _setupInitialRoles();
-
         _logDeployments();
     }
-    
-
 
     function _deployProxy(string memory contractName, address implementation, bytes memory initData) private returns (UUPSProxy proxy) {
         
-        address deployedAddress = create3Deployer.deployCreate3(
-            keccak256(bytes(contractName)),
-            abi.encodePacked(
+        address deployedAddress = deployWithCreate3(abi.encodePacked(
                 type(UUPSProxy).creationCode,
                 abi.encode(address(implementation), initData)
-            )
+            ),
+            keccak256(bytes(contractName))
         );
         
         address expectedAddress = config.readAddress(string.concat(".addresses.", contractName));
@@ -147,19 +135,16 @@ contract DeployCore is Script {
         
         address[] memory executors = new address[](1);
         executors[0] = config.readAddress(".roles.guardian");
-        
-        address deployedAddress = create3Deployer.deployCreate3(
-            keccak256(bytes(string("BeHYPETimelock"))),
-            abi.encodePacked(
-                type(BeHYPETimelock).creationCode,
-                abi.encode(
-                    config.readUint(".timelock.minDelay"),
-                    proposers,
-                    executors,
-                    address(0) // admin of the timelock is the timelock itself
-                )
+
+        address deployedAddress = deployWithCreate3(abi.encodePacked(
+            type(BeHYPETimelock).creationCode,
+            abi.encode(
+                config.readUint(".timelock.minDelay"),
+                proposers,
+                executors,
+                address(0) // admin of the timelock is the timelock itself
             )
-        );
+        ), keccak256(bytes(string("BeHYPETimelock"))));
         
         address expectedAddress = config.readAddress(".addresses.BeHYPETimelock");
         if (deployedAddress != expectedAddress) {
