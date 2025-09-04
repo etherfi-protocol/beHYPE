@@ -1,0 +1,36 @@
+{
+  "addresses": {
+    "BeHYPE": "0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9",
+    "WithdrawManager": "0x9d0B0877b9f2204CF414Ca7862E4f03506822538",
+    "StakingCore": "0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b",
+    "RoleRegistry": "0x90102473a816A01A9fB0809F2289438B2e294F76",
+    "BeHYPETimelock": "0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4",
+    "L1Read": "0xb7467E0524Afba7006957701d1F06A59000d15A2"
+  },
+  "roles": {
+    "admin": "0xb700d555DDcB806634617f861f01fE8F47aA33Ef",
+    "guardian": "0xf27128a5b064e8d97EDaa60D24bFa2FD1eeC26eB",
+    "protocolTreasury": "0xc4bdD45Ff1229146c2c1dc585E66aEb6677cbbf3",
+    "pauser": "0x9AF1298993DC1f397973C62A5D47a284CF76844D"
+  },
+  "token": {
+    "name": "hyperbeat x ether.fi HYPE",
+    "symbol": "beHYPE"
+  },
+  "staking": {
+    "acceptableAprInBps": 500,
+    "exchangeRateGuard": true,
+    "withdrawalCooldownPeriod": 43200
+  },
+  "withdrawals": {
+    "minWithdrawalAmount": "100000000000000000",
+    "maxWithdrawalAmount": "100000000000000000000000",
+    "lowWatermarkInBpsOfTvl": 100,
+    "instantWithdrawalFeeInBps": 30,
+    "bucketCapacity": "100000000000000000000000",
+    "bucketRefillRate": "1000000000000000000"
+  },
+  "timelock": {
+    "minDelay": 1800
+  }
+}
