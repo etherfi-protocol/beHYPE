@@ -64,8 +64,8 @@ contract GnosisHelpers is Script {
     }
     
     bytes32 constant predecessor = 0x0000000000000000000000000000000000000000000000000000000000000000;
-    bytes32 constant salt = 0x0000000000000000000000000000000000000000000000000000000000000000;
-    uint256 constant delay = 259200;
+    bytes32 constant salt = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    uint256 constant delay = 1800;
 
     // Generates the schedule transaction for a Timelock
     function _getTimelockScheduleTransaction(address to, bytes memory data, bool isLasts) internal view returns (string memory) {

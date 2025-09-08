@@ -23,12 +23,12 @@ contract TimelockAcceptOwnership is Script, Test, GnosisHelpers {
         scheduleTx = string.concat(scheduleTx, _getTimelockScheduleTransaction(roleRegistryAddress, abi.encodeWithSignature("acceptOwnership()"), true));
         executeTx = string.concat(executeTx, _getTimelockExecuteTransaction(roleRegistryAddress, abi.encodeWithSignature("acceptOwnership()"),  true));
 
-        vm.writeFile("./output/timelock_accept_ownership_schedule.json", scheduleTx);
-        vm.writeFile("./output/timelock_accept_ownership_execute.json", executeTx);
+        vm.writeFile("./output/timelock_accept_ownership_schedule_fix_delay.json", scheduleTx);
+        vm.writeFile("./output/timelock_accept_ownership_execute_fix_delay.json", executeTx);
 
-        executeGnosisTransactionBundle("./output/timelock_accept_ownership_schedule.json");
-        vm.warp(block.timestamp + 259200);
-        executeGnosisTransactionBundle("./output/timelock_accept_ownership_execute.json");
+        executeGnosisTransactionBundle("./output/timelock_accept_ownership_schedule_fix_delay.json");
+        vm.warp(block.timestamp + 1800);
+        executeGnosisTransactionBundle("./output/timelock_accept_ownership_execute_fix_delay.json");
 
         require(
             RoleRegistry(roleRegistryAddress).owner() == timelockAddress,
