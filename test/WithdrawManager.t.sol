@@ -265,7 +265,7 @@ contract WithdrawManagerTest is BaseTest {
 
         beHYPE.approve(address(withdrawManager), 1 ether);
         vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InsufficientHYPELiquidity.selector));
-        withdrawManager.withdraw(0.1 ether, true, 0.18 ether);
+        withdrawManager.withdraw(0.11 ether, true, 0.1 ether);
     }
 
     function test_instantWithdrawalRateLimit() public {
@@ -274,7 +274,7 @@ contract WithdrawManagerTest is BaseTest {
         vm.startPrank(user);
         stakingCore.stake{value: 5000 ether}("");
         
-        beHYPE.approve(address(withdrawManager), 15 ether);
+        beHYPE.approve(address(withdrawManager), 5000 ether);
         withdrawManager.withdraw(5 ether, true, 4.5 ether);
 
         withdrawManager.withdraw(5 ether, true, 4.5 ether);
@@ -285,6 +285,40 @@ contract WithdrawManagerTest is BaseTest {
 
         vm.warp(block.timestamp + 1 days);
         withdrawManager.withdraw(5 ether, true, 4.5 ether);
+
+        vm.warp(block.timestamp + 365 days);
+        withdrawManager.withdraw(10 ether, true, 9 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
+        withdrawManager.withdraw(0.1 ether, true, 4.5 ether);
+
+        // 0.1 per second refill rate -> 100 seconds to refill 10 HYPE
+        vm.warp(block.timestamp + 100 seconds);
+        withdrawManager.withdraw(10 ether, true, 9 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
+        withdrawManager.withdraw(0.1 ether, true, 9 ether);
+
+        vm.stopPrank();
+        vm.startPrank(admin);
+        withdrawManager.setInstantWithdrawalRefillRatePerSecond(0.01 ether);
+        withdrawManager.setInstantWithdrawalCapacity(100 ether);
+        vm.stopPrank();
+        vm.startPrank(user);
+
+        vm.warp(block.timestamp + 365 days);
+
+        withdrawManager.withdraw(100 ether, true, 90 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
+        withdrawManager.withdraw(0.1 ether, true, 0.1 ether);
+
+        // 0.01 per second refill rate -> 10000 seconds to refill 100 HYPE
+        vm.warp(block.timestamp + 10000 seconds);
+        withdrawManager.withdraw(100 ether, true, 90 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(IWithdrawManager.InstantWithdrawalRateLimitExceeded.selector));
+        withdrawManager.withdraw(0.1 ether, true, 90 ether);
     }
 
     function test_multipleUsersMultipleWithdrawals() public {

@@ -17,7 +17,7 @@ The WithdrawManager manages instant and standard withdrawals (3 to 7 days) reque
 - Standard withdrawal flow:
   1. beHYPE tokens are transferred to the withdrawal manager and a withdrawal request is issued. 
   Exchange rate at time of request determine the HYPE withdrawal amount.
-  2. Off-chain service finalizes withdraws. beHYPE tokens are burnt and HYPE is transfer to the user 
+  2. Off-chain service finalizes withdraws. beHYPE tokens are burnt and HYPE can be claimed by the users.
 - Allows for instant withdrawals for a fee
 - Availability for instant withdrawals is determined by a minimum liquidity threshold as a percentage of TVL and a rate limiter
 
@@ -38,7 +38,7 @@ Core staking contract
 
 ### BeHYPETimelock
 
-Timelock with 3 day delay controlling all upgrade roles for the protocol
+Timelock with 3 day delay controlling all contract updates and 
 
 ## Cross Chain
 
@@ -48,8 +48,8 @@ Timelock with 3 day delay controlling all upgrade roles for the protocol
 
 | Contract | Testnet Address | Mainnet Address |
 |----------|-----------------|-----------------|
-| beHYPE | TBD | TBD |
-| WithdrawManager | TBD | TBD |
-| StakingCore | TBD | TBD |
-| RoleRegistry | TBD | TBD |
-| BeHYPETimelock | TBD | TBD |
+| beHYPE | 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9 | 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9 |
+| WithdrawManager | 0x9d0B0877b9f2204CF414Ca7862E4f03506822538 | 0x9d0B0877b9f2204CF414Ca7862E4f03506822538 |
+| StakingCore | 0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b | 0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b |
+| RoleRegistry | 0x90102473a816A01A9fB0809F2289438B2e294F76 | 0x90102473a816A01A9fB0809F2289438B2e294F76 |
+| BeHYPETimelock | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 |
