@@ -14,8 +14,10 @@ import {IStakingCore} from "../src/interfaces/IStakingCore.sol";
 import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
 import {IRoleRegistry} from "../src/interfaces/IRoleRegistry.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
+import {BeHYPEOFTAdapter} from "../src/BeHYPEOFTAdapter.sol";
 import {SpotBalanceMock} from "./mock/SpotBalanceMock.sol";
 import {DelegatorSummaryMock} from "./mock/DelegatorSummaryMock.sol";
+import {LayerZeroEndpointMock} from "./mock/LayerZeroEndpointMock.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "forge-std/console.sol";
 
@@ -26,11 +28,16 @@ contract BaseTest is Test {
     RoleRegistry public roleRegistry;
     WithdrawManager public withdrawManager;
     StakingCore public stakingCore;
+    BeHYPEOFTAdapter public beHYPEOFTAdapter;
+    LayerZeroEndpointMock public lzEndpoint;
 
     address public admin = makeAddr("admin");
     address public user = makeAddr("user");
     address public user2 = makeAddr("user2");
     address public protocolTreasury = makeAddr("protocolTreasury");
+    address public guardian = makeAddr("guardian");
+    address public pauser = makeAddr("pauser");
+    address public unauthorized = makeAddr("unauthorized");
 
     address constant SPOT_BALANCE_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000801;
     address constant DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS = 0x0000000000000000000000000000000000000805;
@@ -48,6 +55,7 @@ contract BaseTest is Test {
         DelegatorSummaryMock delegatorSummaryMock = new DelegatorSummaryMock();
         L1Read l1Read = new L1Read();
         CoreWriter coreWriter = new CoreWriter();
+        lzEndpoint = new LayerZeroEndpointMock();
 
         vm.etch(SPOT_BALANCE_PRECOMPILE_ADDRESS, address(spotBalanceMock).code);
         vm.etch(DELEGATOR_SUMMARY_PRECOMPILE_ADDRESS, address(delegatorSummaryMock).code);
@@ -102,12 +110,20 @@ contract BaseTest is Test {
             )
         ))));
 
+        BeHYPEOFTAdapter beHYPEOFTAdapterImpl = new BeHYPEOFTAdapter(address(beHYPE), address(lzEndpoint));
+        beHYPEOFTAdapter = BeHYPEOFTAdapter(address(new UUPSProxy(
+            address(beHYPEOFTAdapterImpl),
+            abi.encodeWithSelector(BeHYPEOFTAdapter.initialize.selector, guardian, address(roleRegistry))
+        )));
+
         vm.startPrank(admin);
         beHYPE.setStakingCore(address(stakingCore));
         beHYPE.setWithdrawManager(address(withdrawManager));
         stakingCore.setWithdrawManager(address(withdrawManager));
         roleRegistry.grantRole(roleRegistry.PROTOCOL_ADMIN(), admin);
         roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), admin);
+        roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), pauser); 
+        roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), guardian);
         roleRegistry.setWithdrawManager(address(withdrawManager));
         roleRegistry.setStakingCore(address(stakingCore));
         vm.stopPrank();

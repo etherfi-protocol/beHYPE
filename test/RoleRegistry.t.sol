@@ -12,17 +12,9 @@ import {EnumerableRoles} from "solady/auth/EnumerableRoles.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract RoleRegistryTest is BaseTest {
-    address public guardian = makeAddr("guardian");
-    address public pauser = makeAddr("pauser");
-    address public unauthorized = makeAddr("unauthorized");
 
     function setUp() public override {
         super.setUp();
-        
-        vm.startPrank(admin);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_GUARDIAN(), guardian);
-        roleRegistry.grantRole(roleRegistry.PROTOCOL_PAUSER(), pauser);
-        vm.stopPrank();
     }
 
     function test_setProtocolTreasury() public {

@@ -111,7 +111,7 @@ contract DeploymentVerifyBytecode is ContractCodeChecker, Test {
         _verifyRoleHolders("PROTOCOL_PAUSER", roleRegistry.roleHolders(roleRegistry.PROTOCOL_PAUSER()), expectedPauserArray);
 
         assertEq(roleRegistry.protocolTreasury(), expectedProtocolTreasury);
-        assertEq(roleRegistry.pendingOwner(), timelock);
+        // assertEq(roleRegistry.pendingOwner(), timelock); // ownership has been transferred
         assertEq(address(roleRegistry.withdrawManager()), withdrawManagerProxy);
         assertEq(address(roleRegistry.stakingCore()), stakingCoreProxy);
         
