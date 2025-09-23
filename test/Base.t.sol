@@ -15,6 +15,7 @@ import {IWithdrawManager} from "../src/interfaces/IWithdrawManager.sol";
 import {IRoleRegistry} from "../src/interfaces/IRoleRegistry.sol";
 import {L1Read} from "../src/lib/L1Read.sol";
 import {BeHYPEOFTAdapter} from "../src/BeHYPEOFTAdapter.sol";
+import {BeHYPEOFT} from "../src/BeHYPEOFT.sol";
 import {SpotBalanceMock} from "./mock/SpotBalanceMock.sol";
 import {DelegatorSummaryMock} from "./mock/DelegatorSummaryMock.sol";
 import {LayerZeroEndpointMock} from "./mock/LayerZeroEndpointMock.sol";
@@ -29,6 +30,7 @@ contract BaseTest is Test {
     WithdrawManager public withdrawManager;
     StakingCore public stakingCore;
     BeHYPEOFTAdapter public beHYPEOFTAdapter;
+    BeHYPEOFT public beHYPEOFT;
     LayerZeroEndpointMock public lzEndpoint;
 
     address public admin = makeAddr("admin");
@@ -114,6 +116,12 @@ contract BaseTest is Test {
         beHYPEOFTAdapter = BeHYPEOFTAdapter(address(new UUPSProxy(
             address(beHYPEOFTAdapterImpl),
             abi.encodeWithSelector(BeHYPEOFTAdapter.initialize.selector, guardian, address(roleRegistry))
+        )));
+
+        BeHYPEOFT beHYPEOFTImpl = new BeHYPEOFT(address(lzEndpoint));
+        beHYPEOFT = BeHYPEOFT(address(new UUPSProxy(
+            address(beHYPEOFTImpl),
+            abi.encodeWithSelector(BeHYPEOFT.initialize.selector, "BeHYPE Token", "BeHYPE", guardian)
         )));
 
         vm.startPrank(admin);

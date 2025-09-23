@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BaseTest, UUPSProxy, BeHYPE, BeHYPEOFTAdapter} from "./Base.t.sol";
+import {BaseTest, UUPSProxy, BeHYPE, BeHYPEOFTAdapter, IRoleRegistry} from "./Base.t.sol";
 import {SendParam, MessagingFee} from "lib/devtools/packages/oft-evm/contracts/interfaces/IOFT.sol";
 import {PausableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {Origin} from "lib/devtools/packages/oapp-evm/contracts/oapp/OAppReceiver.sol";
@@ -34,7 +34,7 @@ contract BeHYPEOFTAdapterTest is BaseTest {
         
         address newImplementation = address(new BeHYPEOFTAdapter(beHYPE2, address(lzEndpoint)));
         
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(IRoleRegistry.OnlyProtocolUpgrader.selector));
         beHYPEOFTAdapter.upgradeToAndCall(newImplementation, "");
         
         vm.prank(admin);
@@ -46,7 +46,7 @@ contract BeHYPEOFTAdapterTest is BaseTest {
     function test_PauseBridge() public {
         assertFalse(beHYPEOFTAdapter.paused());
         
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(BeHYPEOFTAdapter.NotAuthorized.selector));
         beHYPEOFTAdapter.pauseBridge();
         
         vm.prank(pauser);
