@@ -22,9 +22,9 @@ contract BeHYPEOFTAdapter is OFTAdapterUpgradeable, UUPSUpgradeable, PausableUpg
     }
 
     function initialize(address _owner, address _roleRegistry) public initializer {
+        __Ownable_init(_owner);
         __OFTAdapter_init(_owner);
         __UUPSUpgradeable_init();
-        __Ownable_init(_owner);
         __Pausable_init();
 
         roleRegistry = IRoleRegistry(_roleRegistry);
