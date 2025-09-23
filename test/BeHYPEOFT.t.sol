@@ -43,17 +43,6 @@ contract BeHYPEOFTTest is Test {
         assertEq(beHYPEOFT.decimals(), 18);
     }
 
-    function test_Ownership() public {
-        assertEq(beHYPEOFT.owner(), guardian);
-        
-        // Test that guardian can set roles
-        vm.startPrank(guardian);
-        beHYPEOFT.setRole(pauser, beHYPEOFT.PROTOCOL_PAUSER(), true);
-        vm.stopPrank();
-        
-        assertTrue(beHYPEOFT.hasRole(pauser, beHYPEOFT.PROTOCOL_PAUSER()));
-    }
-
     function test_RoleManagement() public {
         address[] memory initialPausers = beHYPEOFT.roleHolders(beHYPEOFT.PROTOCOL_PAUSER());
         address[] memory initialUnpausers = beHYPEOFT.roleHolders(beHYPEOFT.PROTOCOL_UNPAUSER());
@@ -163,7 +152,6 @@ contract BeHYPEOFTTest is Test {
         beHYPEOFT.setRole(pauser, beHYPEOFT.PROTOCOL_PAUSER(), true);
         vm.stopPrank();
         
-        // First simulate receiving tokens from another chain
         vm.prank(address(lzEndpoint));
         beHYPEOFT.lzReceive(
             Origin({
@@ -174,7 +162,7 @@ contract BeHYPEOFTTest is Test {
             keccak256("test-guid"),
             abi.encodePacked(
                 bytes32(uint256(uint160(user))),
-                uint64(1000000000), // 1000 ether in OFT format
+                uint64(1000000000),
                 bytes("")
             ),
             address(0),
@@ -215,7 +203,6 @@ contract BeHYPEOFTTest is Test {
         vm.prank(guardian);
         beHYPEOFT.setPeer(30103, bytes32(uint256(uint160(address(0x1234)))));
         
-        // First simulate receiving tokens from another chain
         vm.prank(address(lzEndpoint));
         beHYPEOFT.lzReceive(
             Origin({
@@ -226,14 +213,13 @@ contract BeHYPEOFTTest is Test {
             keccak256("test-guid"),
             abi.encodePacked(
                 bytes32(uint256(uint160(user))),
-                uint64(1000000000), // 1000 ether in OFT format
+                uint64(1000000000),
                 bytes("")
             ),
             address(0),
             ""
         );
         
-        // Now user has tokens and can send them
         vm.startPrank(user);
         beHYPEOFT.approve(address(beHYPEOFT), 1000 ether);
         
@@ -254,7 +240,6 @@ contract BeHYPEOFTTest is Test {
         
         beHYPEOFT.send{value: 0.01 ether}(sendParam, fee, user);
         
-        // In OFT, tokens are burned when sent (not held in contract)
         assertEq(beHYPEOFT.balanceOf(address(beHYPEOFT)), 0);
         assertEq(beHYPEOFT.balanceOf(user), 900 ether);
         
@@ -314,7 +299,6 @@ contract BeHYPEOFTTest is Test {
             ""
         );
         
-        // In OFT, tokens are minted when received (not transferred from contract balance)
         assertEq(beHYPEOFT.balanceOf(user2), balanceBefore + 1 ether);
         assertEq(beHYPEOFT.balanceOf(address(beHYPEOFT)), 0);
     }

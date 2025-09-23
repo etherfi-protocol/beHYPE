@@ -8,12 +8,12 @@ import {PausableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contra
 
 /// @notice OFTAdapter uses a deployed ERC-20 token and SafeERC20 to interact with the OFTCore contract.
 contract BeHYPEOFTAdapter is OFTAdapterUpgradeable, UUPSUpgradeable, PausableUpgradeable {
-    /// @custom:oz-upgrades-unsafe-allow constructor
 
     error NotAuthorized();
 
     IRoleRegistry public roleRegistry;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         address _token,
         address _lzEndpoint
@@ -25,6 +25,7 @@ contract BeHYPEOFTAdapter is OFTAdapterUpgradeable, UUPSUpgradeable, PausableUpg
         __OFTAdapter_init(_owner);
         __UUPSUpgradeable_init();
         __Ownable_init(_owner);
+        __Pausable_init();
 
         roleRegistry = IRoleRegistry(_roleRegistry);
     }
