@@ -17,14 +17,13 @@ contract TimelockRoleTransition is Script, Test, GnosisHelpers {
         
         address roleRegistryAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".addresses.RoleRegistry");
         address timelockAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".addresses.BeHYPETimelock");
-        address currentGuardianAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".roles.guardian");
-        address newGuardianAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".roles.newGuardian");
+        address currentGuardianAddress = 0xf27128a5b064e8d97EDaa60D24bFa2FD1eeC26eB;
+        address newGuardianAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".roles.guardian");
 
         bytes32 PROTOCOL_GUARDIAN_ROLE = RoleRegistry(roleRegistryAddress).PROTOCOL_GUARDIAN();
-        bytes32 PROPOSER_ROLE = 0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1; // PROPOSER_ROLE
-        bytes32 EXECUTOR_ROLE = 0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63; // EXECUTOR_ROLE
+        bytes32 PROPOSER_ROLE = BeHYPETimelock(payable(timelockAddress)).PROPOSER_ROLE();
+        bytes32 EXECUTOR_ROLE = BeHYPETimelock(payable(timelockAddress)).EXECUTOR_ROLE();
 
-        // Generate schedule transaction bundle
         string memory scheduleTx = _getGnosisHeader("999", addressToHex(currentGuardianAddress));
         
         // Schedule: Grant PROTOCOL_GUARDIAN role to new guardian
