@@ -15,13 +15,11 @@ contract TimelockRoleTransition is Script, Test, GnosisHelpers {
     function run() external {
         vm.createSelectFork("https://rpc.hyperliquid.xyz/evm");
         
-        // Get addresses from config
         address roleRegistryAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".addresses.RoleRegistry");
         address timelockAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".addresses.BeHYPETimelock");
         address currentGuardianAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".roles.guardian");
         address newGuardianAddress = vm.parseJsonAddress(vm.readFile("config/production.json"), ".roles.newGuardian");
 
-        // Get role constants
         bytes32 PROTOCOL_GUARDIAN_ROLE = RoleRegistry(roleRegistryAddress).PROTOCOL_GUARDIAN();
         bytes32 PROPOSER_ROLE = 0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1; // PROPOSER_ROLE
         bytes32 EXECUTOR_ROLE = 0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63; // EXECUTOR_ROLE
@@ -116,16 +114,13 @@ contract TimelockRoleTransition is Script, Test, GnosisHelpers {
             true
         ));
 
-        // Write transaction files
         vm.writeFile("./output/timelock_role_transition_schedule.json", scheduleTx);
         vm.writeFile("./output/timelock_role_transition_execute.json", executeTx);
 
-        // Execute the transactions to test
         executeGnosisTransactionBundle("./output/timelock_role_transition_schedule.json");
         vm.warp(block.timestamp + 1800);
         executeGnosisTransactionBundle("./output/timelock_role_transition_execute.json");
 
-        // Verify role transitions were successful
         require(
             RoleRegistry(roleRegistryAddress).hasRole(PROTOCOL_GUARDIAN_ROLE, newGuardianAddress),
             "New guardian was not granted PROTOCOL_GUARDIAN role"
