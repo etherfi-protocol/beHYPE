@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/*
- * OFT Deployment Verification Script
- * 
- * To verify BeHYPEOFT on Scroll:
- * forge test --match-test test_verifyBeHYPEOFTOnScroll -vv
- * 
- * To verify BeHYPEOFTAdapter on HyperEVM:
- * forge test --match-test test_verifyBeHYPEOFTAdapterOnHyperEVM -vv
- * 
- * To run all OFT verifications:
- * forge test --match-contract OFTDeploymentVerifyBytecode -vv
- */
-
 import { Test, console } from "forge-std/Test.sol";
 import { ContractCodeChecker } from "../utils/ContractCodeChecker.sol";
 import { BeHYPEOFT } from "../../src/BeHYPEOFT.sol";
