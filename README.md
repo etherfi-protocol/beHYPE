@@ -42,14 +42,17 @@ Timelock with 3 day delay controlling all contract updates and
 
 ## Cross Chain
 
-`OFT` contracts and deployment scripts to be added at a later date
+- `BeHYPEOFTAdapter` deployed to hyperEVM 
+- `BeHYPEOFT` deployed to scroll for ether.fi cash integration
 
 ## Contract Deployed Addresses
 
-| Contract | Testnet Address | Mainnet Address |
-|----------|-----------------|-----------------|
-| beHYPE | 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9 | 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9 |
-| WithdrawManager | 0x9d0B0877b9f2204CF414Ca7862E4f03506822538 | 0x9d0B0877b9f2204CF414Ca7862E4f03506822538 |
-| StakingCore | 0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b | 0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b |
-| RoleRegistry | 0x90102473a816A01A9fB0809F2289438B2e294F76 | 0x90102473a816A01A9fB0809F2289438B2e294F76 |
-| BeHYPETimelock | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 |
+| Contract | Mainnet Address |
+|----------|-----------------|
+| beHYPE | 0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9 |
+| WithdrawManager | 0x9d0B0877b9f2204CF414Ca7862E4f03506822538 |
+| StakingCore | 0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b |
+| RoleRegistry | 0x90102473a816A01A9fB0809F2289438B2e294F76 |
+| BeHYPETimelock | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 |
+| BeHYPEOFTAdapter | 0x637De4A55cdD37700F9B54451B709b01040D48dF |
+| BeHYPEOFT | 0xA519AfBc91986c0e7501d7e34968FEE51CD901aC | 
