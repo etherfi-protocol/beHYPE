@@ -12,8 +12,9 @@
   },
   "roles": {
     "admin": "0xb700d555DDcB806634617f861f01fE8F47aA33Ef",
-    "guardian": "0xf27128a5b064e8d97EDaa60D24bFa2FD1eeC26eB",
+    "adminHyperbeat": "0xe15f17886FB573b2D25EaeCa7781351eAcC4f758",
     "scrollController": "0x3cD08f51D0EA86ac93368DE31822117cd70CECA3",
+    "guardian": "0x2fC76670da4A6788f51DA6642D57549032f61e7C",
     "protocolTreasury": "0xc4bdD45Ff1229146c2c1dc585E66aEb6677cbbf3",
     "pauser": "0x9AF1298993DC1f397973C62A5D47a284CF76844D"
   },
