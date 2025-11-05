@@ -24,8 +24,8 @@ import {UlnConfig} from "lib/LayerZero-v2/packages/layerzero-v2/evm/messagelib/c
 contract DeployAndConfigureOAppsTest is Script, Utils {
     using stdJson for string;
 
-    address payable public constant HYPEREVM_DEPLOYMENT = payable(address(0x07B23BB48BDf6C223D727e0979DcE34f3e911b40));
-    address payable public constant SCROLL_DEPLOYMENT = payable(address(0x15Ce935E7721Cee88B4Bc0bb4Dc89bb348Cd3A4A));
+    address payable public constant HYPEREVM_DEPLOYMENT = payable(address(0x0B7a7144FE17D57a55fD24aa45325140276C886d));
+    address payable public constant SCROLL_DEPLOYMENT = payable(address(0xd713399553215AdE231175fCB44857e66487F54E));
     
     address payable public l1BeHYPEOAppStaker;
     address payable public l2BeHYPEOAppStaker;
@@ -93,7 +93,7 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
                 type(UUPSProxy).creationCode,
                 abi.encode(impl, abi.encodeWithSelector(L1BeHYPEOAppStaker.initialize.selector, owner))
             ),
-            keccak256(bytes("L1BeHYPEOAppStakerTest2"))
+            keccak256(bytes("L1BeHYPEOAppStakerTest3"))
         );
         return payable(proxy);
     }
@@ -104,7 +104,7 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
                 type(UUPSProxy).creationCode,
                 abi.encode(impl, abi.encodeWithSelector(L2BeHYPEOAppStaker.initialize.selector, owner, enforceOptions, lzReceiveGasLimit))
             ),
-            keccak256(bytes("L2BeHYPEOAppStakerTest2"))
+            keccak256(bytes("L2BeHYPEOAppStakerTest3"))
         );
         return payable(proxy);
     }

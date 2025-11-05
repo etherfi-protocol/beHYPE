@@ -30,6 +30,9 @@ contract L1BeHYPEOAppStaker is
     IStakingCore public constant STAKING_CORE = IStakingCore(0xCeaD893b162D38e714D82d06a7fe0b0dc3c38E0b);
     BeHYPEOFTAdapter public constant BEHYPE_OFT_ADAPTER = BeHYPEOFTAdapter(0x637De4A55cdD37700F9B54451B709b01040D48dF);
     IERC20 public constant BEHYPE = IERC20(0xd8FC8F0b03eBA61F64D08B0bef69d80916E5DdA9);
+    address public constant WHYPE_OFT_ADAPTER = 0x2B7E48511ea616101834f09945c11F7d78D9136d;
+
+    error OnlyWHYPEOFTAdapter();
 
     constructor(address _endpoint) OAppUpgradeable(_endpoint) {
         _disableInitializers();
@@ -55,6 +58,7 @@ contract L1BeHYPEOAppStaker is
         bytes calldata /*_extraData*/
     ) external payable override {
         if (address(endpoint) != msg.sender) revert OnlyEndpoint(msg.sender);
+        if (_from != WHYPE_OFT_ADAPTER) revert OnlyWHYPEOFTAdapter();
         
         uint256 amountReceived = OFTComposeMsgCodec.amountLD(_message);
         bytes memory originalComposeMsg = OFTComposeMsgCodec.composeMsg(_message);
