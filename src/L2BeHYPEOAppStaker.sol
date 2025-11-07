@@ -23,72 +23,107 @@ contract L2BeHYPEOAppStaker is
     uint32 public constant HYPEREVM_EID = 30367;
     IOFT public constant WHYPE = IOFT(0xd83E3d560bA6F05094d9D8B3EB8aaEA571D1864E);
     uint128 public enforceOptions;
+    uint128 public lzReceiveGasLimit;
 
     error InsufficientFee();
+    error AmountContainsDust();
 
     struct StakeParams {
         SendParam oftParam;
-        bytes message;
-        bytes options;
         MessagingFee oftFee;
-        MessagingFee lzFee;
+        uint256 WHYPEWithoutDust;
     }
 
     constructor(address _endpoint) OAppUpgradeable(_endpoint) {
         _disableInitializers();
     }
 
-    function initialize(address _owner, uint128 _enforceOptions) external initializer {
+    function initialize(address _owner, uint128 _enforceOptions, uint128 _lzReceiveGasLimit) external initializer {
         __Ownable_init(_owner);
         __OApp_init(_owner);
         __UUPSUpgradeable_init();
         
         enforceOptions = _enforceOptions;
+        lzReceiveGasLimit = _lzReceiveGasLimit;
     }
 
+    /**
+     * @notice Quotes the total fee required to stake WHYPE tokens
+     * @param hypeAmountIn The amount of WHYPE tokens to stake
+     * @param receiver The user's cash safe address where beHYPE will be asynchronously delivered
+     */
     function quoteStake(
         uint256 hypeAmountIn,
         address receiver
     ) external view returns (uint256 totalFee) {
         StakeParams memory params = _buildStakeParams(hypeAmountIn, receiver);
-        totalFee = params.oftFee.nativeFee + params.lzFee.nativeFee;
+        return params.oftFee.nativeFee;
     }
 
-    function stake(uint256 hypeAmountIn, address staker, address receiver) external payable {
+    /**
+     * @notice Stakes WHYPE tokens by sending them cross-chain to be staked on HyperEVM
+     * @dev Reverts if the amount contains dust beyond shared decimal precision
+     * @param hypeAmountIn The amount of WHYPE tokens to stake
+     * @param receiver The user's cash safe address where beHYPE will be asynchronously delivered after staking completes
+     */
+    function stake(uint256 hypeAmountIn, address receiver) external payable { 
         StakeParams memory params = _buildStakeParams(hypeAmountIn, receiver);
-
-        uint256 totalFee = params.oftFee.nativeFee + params.lzFee.nativeFee;
-        if (msg.value < totalFee) revert InsufficientFee();
+        if (msg.value < params.oftFee.nativeFee) revert InsufficientFee();
         
-        // Send the users WHYPE to the peer contract on hyperEVM
-        IERC20(address(WHYPE)).transferFrom(staker, address(this), hypeAmountIn);
+        IERC20(address(WHYPE)).transferFrom(msg.sender, address(this), params.WHYPEWithoutDust);
         WHYPE.send{value: params.oftFee.nativeFee}(params.oftParam, params.oftFee, msg.sender);
-        
-        // Send the message to the peer contract on hyperEVM to stake the WHYPE for the user
-        _lzSend(HYPEREVM_EID, params.message, params.options, params.lzFee, payable(msg.sender));
+    }
+
+    /**
+     * @notice Updates the enforceOptions parameter used for executor LzCompose options
+     * @param _enforceOptions The new enforceOptions value (gas limit for lzCompose execution)
+     */
+    function setEnforceOptions(uint128 _enforceOptions) external onlyOwner {
+        enforceOptions = _enforceOptions;
+    }
+
+    /**
+     * @notice Updates the lzReceiveGasLimit parameter used for executor LzReceive options
+     * @param _lzReceiveGasLimit The new lzReceiveGasLimit value (gas limit for lzReceive execution)
+     */
+    function setLzReceiveGasLimit(uint128 _lzReceiveGasLimit) external onlyOwner {
+        lzReceiveGasLimit = _lzReceiveGasLimit;
     }
 
     function _buildStakeParams(
         uint256 hypeAmountIn,
         address receiver
     ) internal view returns (StakeParams memory params) {
-        uint256 minAmount = hypeAmountIn - (hypeAmountIn / 100);
+        bytes memory composeMsg = abi.encode(receiver);
 
+        bytes memory options = OptionsBuilder.newOptions()
+            .addExecutorLzReceiveOption(lzReceiveGasLimit, 0)
+            .addExecutorLzComposeOption(0, enforceOptions, 0);
+
+        uint256 amountWithoutDust = _removeDust(hypeAmountIn);
+        params.WHYPEWithoutDust = amountWithoutDust;
         params.oftParam = SendParam({
             dstEid: HYPEREVM_EID,
             to: _getPeerOrRevert(HYPEREVM_EID),
-            amountLD: hypeAmountIn,
-            minAmountLD: minAmount,
-            extraOptions: "",
-            composeMsg: "",
+            amountLD: amountWithoutDust,
+            minAmountLD: amountWithoutDust,
+            extraOptions: options,
+            composeMsg: composeMsg,
             oftCmd: ""
         });
+        
         params.oftFee = WHYPE.quoteSend(params.oftParam, false);
-        
-        params.message = abi.encode(hypeAmountIn, receiver);
-        params.options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(enforceOptions, 0);
-        
-        params.lzFee = _quote(HYPEREVM_EID, params.message, params.options, false);
+    }
+
+    /**
+     * @dev Removes dust from the given local decimal amount using the OFT's decimalConversionRate
+     * @param _amountLD The amount in local decimals
+     * @return The amount after removing dust
+     * @dev matches the calculation used in OFTCore: (amountLD / conversionRate) * conversionRate
+     */
+    function _removeDust(uint256 _amountLD) internal pure returns (uint256) {
+        uint256 conversionRate = 1e12; // 10^12 (18 decimals - 6 shared decimals)
+        return (_amountLD / conversionRate) * conversionRate;
     }
 
     function _lzReceive(
@@ -98,14 +133,6 @@ contract L2BeHYPEOAppStaker is
         address /*_executor*/,
         bytes calldata /*_extraData*/
     ) internal override {}
-
-    /**
-     * @dev Allow multiple LayerZero messages in a single transaction by accepting msg.value >= per-fee.
-     */
-    function _payNative(uint256 _nativeFee) internal override returns (uint256 nativeFee) {
-        if (msg.value < _nativeFee) revert NotEnoughNative(msg.value);
-        return _nativeFee;
-    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
