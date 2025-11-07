@@ -8,7 +8,6 @@
     "L1Read": "0xb7467E0524Afba7006957701d1F06A59000d15A2",
     "BeHYPEOFT": "0xA519AfBc91986c0e7501d7e34968FEE51CD901aC",
     "BeHYPEOFTAdapter": "0x637De4A55cdD37700F9B54451B709b01040D48dF"
-
   },
   "roles": {
     "admin": "0xb700d555DDcB806634617f861f01fE8F47aA33Ef",
@@ -39,6 +38,8 @@
     "minDelay": 1800
   },
   "layerZero": {
+    "L1BeHYPEOAppStaker": "0xE6a3BcD93e9D56E5252Db47fF512629Fd3Cc9b54",
+    "L2BeHYPEOAppStaker": "0x3f1Bdae959cEd680E434Fe201861E97976eA4A8F",
     "hyperEVM": {
       "eid": "30367",
       "endpoint": "0x3A73033C0b1407574C76BdBAc67f126f6b4a9AA9",
