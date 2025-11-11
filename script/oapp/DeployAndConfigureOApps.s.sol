@@ -17,15 +17,14 @@ import {UlnConfig} from "lib/LayerZero-v2/packages/layerzero-v2/evm/messagelib/c
 /// Deploys and configures L1BeHYPEOAppStaker (on HyperEVM) and L2BeHYPEOAppStaker (on Scroll)
 /// 
 /// Usage:
-///   forge script script/oapp/DeployAndConfigureOAppsTest.s.sol:DeployAndConfigureOAppsTest \
+///   forge script script/oapp/DeployAndConfigureOApps.s.sol:DeployAndConfigureOApps \
 ///     --rpc-url $RPC \
 ///     --broadcast \
 ///     -vvvv
-contract DeployAndConfigureOAppsTest is Script, Utils {
+contract DeployAndConfigureOApps is Script, Utils {
     using stdJson for string;
 
-    address payable public constant HYPEREVM_DEPLOYMENT = payable(address(0x0B7a7144FE17D57a55fD24aa45325140276C886d));
-    address payable public constant SCROLL_DEPLOYMENT = payable(address(0xd713399553215AdE231175fCB44857e66487F54E));
+
     
     address payable public l1BeHYPEOAppStaker;
     address payable public l2BeHYPEOAppStaker;
@@ -34,22 +33,26 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
         string memory cfg = _readConfig();
         bool isScroll = (block.chainid == 534352);
         uint128 enforceGas = uint128(500_000);
-        uint128 lzReceiveGasLimit = uint128(200_000);
+        uint128 lzReceiveGasLimit = uint128(170_000);
         address owner = msg.sender;
+
+        address l2BeHYPEOAppStakerAddress = cfg.readAddress(".layerZero.L2BeHYPEOAppStaker");
+        address l1BeHYPEOAppStakerAddress = cfg.readAddress(".layerZero.L1BeHYPEOAppStaker");
+
 
         vm.startBroadcast();
 
         if (isScroll) {
             L2BeHYPEOAppStaker l2Impl = new L2BeHYPEOAppStaker(cfg.readAddress(".layerZero.scroll.endpoint"));
             l2BeHYPEOAppStaker = _deployL2OAppStaker(address(l2Impl), owner, enforceGas, lzReceiveGasLimit);
-            
-            if (l2BeHYPEOAppStaker != address(SCROLL_DEPLOYMENT)) {
-                revert("L2BeHYPEOAppStaker is not the same as SCROLL_DEPLOYMENT");
+
+            if (l2BeHYPEOAppStaker != l2BeHYPEOAppStakerAddress) {
+                revert("L2BeHYPEOAppStaker is not the same as l1BeHYPEOAppStakerAddress");
             }
 
             address scrollEndpoint = cfg.readAddress(".layerZero.scroll.endpoint");
             uint32 dstEid = uint32(cfg.readUint(".layerZero.hyperEVM.eid"));
-            L2BeHYPEOAppStaker(l2BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(address(HYPEREVM_DEPLOYMENT)))));
+            L2BeHYPEOAppStaker(l2BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(l1BeHYPEOAppStakerAddress))));
             
             _setDVN(
                 dstEid,
@@ -65,13 +68,13 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
             L1BeHYPEOAppStaker l1Impl = new L1BeHYPEOAppStaker(cfg.readAddress(".layerZero.hyperEVM.endpoint"));
             l1BeHYPEOAppStaker = _deployL1OAppStaker(address(l1Impl), owner);
             
-            if (l1BeHYPEOAppStaker != address(HYPEREVM_DEPLOYMENT)) {
-                revert("L1BeHYPEOAppStaker is not the same as HYPEREVM_DEPLOYMENT");
+            if (l1BeHYPEOAppStaker != l1BeHYPEOAppStakerAddress) {
+                revert("L1BeHYPEOAppStaker is not the same as l1BeHYPEOAppStakerAddress");
             }
 
             address hyperEVMEndpoint = cfg.readAddress(".layerZero.hyperEVM.endpoint");
             uint32 dstEid = uint32(cfg.readUint(".layerZero.scroll.eid"));
-            L1BeHYPEOAppStaker(l1BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(address(SCROLL_DEPLOYMENT)))));
+            L1BeHYPEOAppStaker(l1BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(l2BeHYPEOAppStakerAddress))));
             
             _setDVN(
                 dstEid,
@@ -93,7 +96,7 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
                 type(UUPSProxy).creationCode,
                 abi.encode(impl, abi.encodeWithSelector(L1BeHYPEOAppStaker.initialize.selector, owner))
             ),
-            keccak256(bytes("L1BeHYPEOAppStakerTest3"))
+            keccak256(bytes("L1BeHYPEOAppStaker"))
         );
         return payable(proxy);
     }
@@ -104,7 +107,7 @@ contract DeployAndConfigureOAppsTest is Script, Utils {
                 type(UUPSProxy).creationCode,
                 abi.encode(impl, abi.encodeWithSelector(L2BeHYPEOAppStaker.initialize.selector, owner, enforceOptions, lzReceiveGasLimit))
             ),
-            keccak256(bytes("L2BeHYPEOAppStakerTest3"))
+            keccak256(bytes("L2BeHYPEOAppStaker"))
         );
         return payable(proxy);
     }
