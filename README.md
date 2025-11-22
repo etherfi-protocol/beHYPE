@@ -44,6 +44,7 @@ Timelock with 3 day delay controlling all contract updates and
 
 - `BeHYPEOFTAdapter` deployed to hyperEVM 
 - `BeHYPEOFT` deployed to scroll for ether.fi cash integration
+- 
 
 ## Contract Deployed Addresses
 
@@ -55,4 +56,7 @@ Timelock with 3 day delay controlling all contract updates and
 | RoleRegistry | 0x90102473a816A01A9fB0809F2289438B2e294F76 |
 | BeHYPETimelock | 0xA24aF73EaDD17997EeEdbEd36672e996544D2DE4 |
 | BeHYPEOFTAdapter | 0x637De4A55cdD37700F9B54451B709b01040D48dF |
-| BeHYPEOFT | 0xA519AfBc91986c0e7501d7e34968FEE51CD901aC | 
+| BeHYPEOFT | 0xA519AfBc91986c0e7501d7e34968FEE51CD901aC |
+| L1BeHYPEOAppStaker | 0xE6a3BcD93e9D56E5252Db47fF512629Fd3Cc9b54 |
+| L2BeHYPEOAppStaker | 0x3f1Bdae959cEd680E434Fe201861E97976eA4A8F |
+
