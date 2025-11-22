@@ -44,7 +44,9 @@ Timelock with 3 day delay controlling all contract updates and
 
 - `BeHYPEOFTAdapter` deployed to hyperEVM 
 - `BeHYPEOFT` deployed to scroll for ether.fi cash integration
-- 
+- `L2BeHYPEOAppStaker` entry point for minting beHYPE on scroll with WHYPE
+- `L1BeHYPEOAppStaker` receives HYPE and staking metadata from L2BeHYPEOAppStaker on hyperEVM.
+HYPE is staked for beHYPE and the beHYPE is bridged back to the specified staker on scroll. 
 
 ## Contract Deployed Addresses
 
