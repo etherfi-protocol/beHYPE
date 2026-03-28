@@ -13,6 +13,7 @@
     "admin": "0xb700d555DDcB806634617f861f01fE8F47aA33Ef",
     "adminHyperbeat": "0xe15f17886FB573b2D25EaeCa7781351eAcC4f758",
     "scrollController": "0x3cD08f51D0EA86ac93368DE31822117cd70CECA3",
+    "optimismController": "0x764682c769CcB119349d92f1B63ee1c03d6AECFf",
     "guardian": "0x2fC76670da4A6788f51DA6642D57549032f61e7C",
     "protocolTreasury": "0xc4bdD45Ff1229146c2c1dc585E66aEb6677cbbf3",
     "pauser": "0x9AF1298993DC1f397973C62A5D47a284CF76844D"
@@ -48,13 +49,13 @@
       "send302": "0xfd76d9CB0Bac839725aB79127E7411fe71b1e3CA",
       "receive302": "0x7cacBe439EaD55fa1c22790330b12835c6884a91"
     },
-    "scroll": {
-      "eid": "30214",
+    "optimism": {
+      "eid": "30111",
       "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-      "nevermindDvn": "0x446755349101cb20c582c224462c3912d3584dce",
-      "layerZeroDvn": "0xbe0d08a85eebfcc6eda0a843521f7cbb1180d2e2",
-      "send302": "0x9BbEb2B2184B9313Cf5ed4a4DDFEa2ef62a2a03B",
-      "receive302": "0x8363302080e711E0CAb978C081b9e69308d49808"
+      "nevermindDvn": "0xa7b5189bca84cd304d8553977c7c614329750d99",
+      "layerZeroDvn": "0x6a02d83e8d433304bba74ef1c427913958187142",
+      "send302": "0x1322871e4ab09Bc7f5717189434f97bBD9546e95",
+      "receive302": "0x3c4962Ff6258dcfCafD23a814237B7d6Eb712063"
     }
   }
 }

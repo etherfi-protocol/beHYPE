@@ -142,4 +142,3 @@ contract OFTDeploymentVerifyBytecode is ContractCodeChecker, Test {
         return address(uint160(uint256(slotValue)));
     }
 }
-

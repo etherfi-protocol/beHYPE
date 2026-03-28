@@ -8,9 +8,9 @@ import "../../src/BeHYPEOFT.sol";
 import "../../src/BeHYPEOFTAdapter.sol";
 
 /*
-* For Scroll (BeHYPEOFT):
+* For Optimism (BeHYPEOFT):
 * forge script script/OFT/TransferOFTOwnership.s.sol:TransferOFTOwnership \
-* --rpc-url $SCROLL_RPC \
+* --rpc-url $OPTIMISM_RPC \
 * --broadcast
 *
 * For HyperEVM (BeHYPEOFTAdapter):
@@ -23,7 +23,7 @@ contract TransferOFTOwnership is Script {
 
     string public config;
     address public scriptDeployer;
-    bool public isScroll;
+    bool public isOptimism;
 
     function run() external {
         config = vm.readFile("config/production.json");
@@ -32,10 +32,10 @@ contract TransferOFTOwnership is Script {
         vm.startBroadcast();
         
         uint256 chainId = block.chainid;
-        isScroll = (chainId == 534352);
+        isOptimism = (chainId == 10);
 
-        if (isScroll) {
-            _transferScrollOFTOwnership();
+        if (isOptimism) {
+            _transferOptimismOFTOwnership();
         } else {
             _transferHyperEVMOFTAdapterOwnership();
         }
@@ -43,20 +43,20 @@ contract TransferOFTOwnership is Script {
         vm.stopBroadcast();
     }
 
-    function _transferScrollOFTOwnership() private {
+    function _transferOptimismOFTOwnership() private {
         address oftAddress = config.readAddress(".addresses.BeHYPEOFT");
-        address scrollController = config.readAddress(".roles.scrollController");
+        address optimismController = config.readAddress(".roles.optimismController");
         address pauser = config.readAddress(".roles.pauser");
 
         BeHYPEOFT oft = BeHYPEOFT(oftAddress);
 
-        oft.setDelegate(scrollController);
+        oft.setDelegate(optimismController);
 
         oft.setRole(pauser, oft.PROTOCOL_PAUSER(), true);
 
-        oft.setRole(scrollController, oft.PROTOCOL_UNPAUSER(), true);
+        oft.setRole(optimismController, oft.PROTOCOL_UNPAUSER(), true);
 
-        oft.transferOwnership(scrollController);
+        oft.transferOwnership(optimismController);
 
     }
 

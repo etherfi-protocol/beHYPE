@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {console} from "forge-std/console.sol";
 import "forge-std/StdJson.sol";
 import "../../src/lib/UUPSProxy.sol";
 import "../../src/BeHYPEOFT.sol";
@@ -25,34 +24,34 @@ contract DeployOFT is Script, Utils {
 
     string public config;
     string public configPath;
-    bool public isScroll;
+    bool public isOptimism;
     EnforcedOptionParam[] public enforcedOptions;
 
     /*
-    * For Scroll (BeHYPEOFT):
-    * forge script script/OFT/DeployOFT.s.sol:DeployOFT \
-    * --rpc-url $SCROLL_RPC \
+    * For Optimism (BeHYPEOFT):
+    * forge script script/oft/DeployOFT.s.sol:DeployOFT \
+    * --rpc-url $OPTIMISM_RPC \
     * --ledger \
     * --sender 0xd8F3803d8412e61e04F53e1C9394e13eC8b32550 \
     * --broadcast \
     * --verify \
     *
     * For HyperEVM (BeHYPEOFTAdapter):
-    * forge script script/OFT/DeployOFT.s.sol:DeployOFT \
+    * forge script script/oft/DeployOFT.s.sol:DeployOFT \
     * --rpc-url $HYPEREVM_RPC \
     * --ledger \
     * --sender 0xd8F3803d8412e61e04F53e1C9394e13eC8b32550 \
     * --broadcast \
-    * --verify 
+    * --verify
     */
     function run() external {
         config = vm.readFile("config/production.json");
 
         vm.startBroadcast();
         uint256 chainId = block.chainid;
-        isScroll = (chainId == 534352);
+        isOptimism = (chainId == 10);
 
-        if (isScroll) {
+        if (isOptimism) {
             _deployBeHYPEOFT();
             _configureBeHYPEOFT();
         } else {
@@ -64,9 +63,9 @@ contract DeployOFT is Script, Utils {
     }
 
     function _deployBeHYPEOFT() private {
-        address scrollEndpoint = config.readAddress(".layerZero.scroll.endpoint");
-        
-        beHYPEOFTImpl = new BeHYPEOFT(scrollEndpoint);
+        address optimismEndpoint = config.readAddress(".layerZero.optimism.endpoint");
+
+        beHYPEOFTImpl = new BeHYPEOFT(optimismEndpoint);
 
         address deployedAddress = deployWithCreate3(
             abi.encodePacked(
@@ -95,7 +94,7 @@ contract DeployOFT is Script, Utils {
     function _deployBeHYPEOFTAdapter() private {
         address hyperEVMEndpoint = config.readAddress(".layerZero.hyperEVM.endpoint");
         address beHYPEToken = config.readAddress(".addresses.BeHYPE");
-        
+
         beHYPEOFTAdapterImpl = new BeHYPEOFTAdapter(beHYPEToken, hyperEVMEndpoint);
 
         address deployedAddress = deployWithCreate3(
@@ -114,7 +113,7 @@ contract DeployOFT is Script, Utils {
         );
 
         address expectedAddress = config.readAddress(".addresses.BeHYPEOFTAdapter");
-        if  (deployedAddress != expectedAddress) {
+        if (deployedAddress != expectedAddress) {
             revert(string(abi.encodePacked("Address mismatch for BeHYPEOFTAdapter")));
         }
 
@@ -122,22 +121,23 @@ contract DeployOFT is Script, Utils {
     }
 
     function _configureBeHYPEOFT() private {
-        BeHYPEOFT oft = BeHYPEOFT(address(oftProxy));
-        
+        // BeHYPEOFT oft = BeHYPEOFT(address(oftProxy));
+        BeHYPEOFT oft = BeHYPEOFT(config.readAddress(".addresses.BeHYPEOFT"));
+
         uint32 hyperEVMEid = uint32(config.readUint(".layerZero.hyperEVM.eid"));
         address hyperEVMAdapter = config.readAddress(".addresses.BeHYPEOFTAdapter");
-        
+
         oft.setPeer(hyperEVMEid, bytes32(uint256(uint160(hyperEVMAdapter))));
 
-        address scrollEndpoint = config.readAddress(".layerZero.scroll.endpoint");
+        address optimismEndpoint = config.readAddress(".layerZero.optimism.endpoint");
         _setDVN(
             hyperEVMEid,
-            scrollEndpoint,
-            config.readAddress(".layerZero.scroll.send302"),
-            config.readAddress(".layerZero.scroll.receive302"),
-            config.readAddress(".layerZero.scroll.nevermindDvn"),
-            config.readAddress(".layerZero.scroll.layerZeroDvn"),
-            address(oftProxy)
+            optimismEndpoint,
+            config.readAddress(".layerZero.optimism.send302"),
+            config.readAddress(".layerZero.optimism.receive302"),
+            config.readAddress(".layerZero.optimism.nevermindDvn"),
+            config.readAddress(".layerZero.optimism.layerZeroDvn"),
+            address(oft)
         );
 
         _appendEnforcedOptions(hyperEVMEid);
@@ -146,15 +146,15 @@ contract DeployOFT is Script, Utils {
 
     function _configureBeHYPEOFTAdapter() private {
         BeHYPEOFTAdapter adapter = BeHYPEOFTAdapter(address(oftAdapterProxy));
-        
-        uint32 scrollEid = uint32(config.readUint(".layerZero.scroll.eid"));
-        address scrollOFT = config.readAddress(".addresses.BeHYPEOFT");
-        
-        adapter.setPeer(scrollEid, bytes32(uint256(uint160(scrollOFT))));
+
+        uint32 optimismEid = uint32(config.readUint(".layerZero.optimism.eid"));
+        address optimismOFT = config.readAddress(".addresses.BeHYPEOFT");
+
+        adapter.setPeer(optimismEid, bytes32(uint256(uint160(optimismOFT))));
 
         address hyperEVMEndpoint = config.readAddress(".layerZero.hyperEVM.endpoint");
         _setDVN(
-            scrollEid,
+            optimismEid,
             hyperEVMEndpoint,
             config.readAddress(".layerZero.hyperEVM.send302"),
             config.readAddress(".layerZero.hyperEVM.receive302"),
@@ -163,7 +163,7 @@ contract DeployOFT is Script, Utils {
             address(oftAdapterProxy)
         );
 
-        _appendEnforcedOptions(scrollEid);
+        _appendEnforcedOptions(optimismEid);
         adapter.setEnforcedOptions(enforcedOptions);
     }
 
@@ -214,4 +214,3 @@ contract DeployOFT is Script, Utils {
         }));
     }
 }
-
