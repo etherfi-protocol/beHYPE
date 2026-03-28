@@ -49,6 +49,14 @@
       "send302": "0xfd76d9CB0Bac839725aB79127E7411fe71b1e3CA",
       "receive302": "0x7cacBe439EaD55fa1c22790330b12835c6884a91"
     },
+    "scroll": {
+      "eid": "30214",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "nevermindDvn": "0x446755349101cb20c582c224462c3912d3584dce",
+      "layerZeroDvn": "0xbe0d08a85eebfcc6eda0a843521f7cbb1180d2e2",
+      "send302": "0x9BbEb2B2184B9313Cf5ed4a4DDFEa2ef62a2a03B",
+      "receive302": "0x8363302080e711E0CAb978C081b9e69308d49808"
+    },
     "optimism": {
       "eid": "30111",
       "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
