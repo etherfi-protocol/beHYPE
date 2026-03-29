@@ -14,7 +14,7 @@ import {SetConfigParam} from "lib/LayerZero-v2/packages/layerzero-v2/evm/protoco
 import {UlnConfig} from "lib/LayerZero-v2/packages/layerzero-v2/evm/messagelib/contracts/uln/UlnBase.sol";
 
 ///
-/// Deploys and configures L1BeHYPEOAppStaker (on HyperEVM) and L2BeHYPEOAppStaker (on Scroll)
+/// Deploys and configures L1BeHYPEOAppStaker (on HyperEVM) and L2BeHYPEOAppStaker (on Optimism)
 /// 
 /// Usage:
 ///   forge script script/oapp/DeployAndConfigureOApps.s.sol:DeployAndConfigureOApps \
@@ -31,7 +31,7 @@ contract DeployAndConfigureOApps is Script, Utils {
 
     function run() external {
         string memory cfg = _readConfig();
-        bool isScroll = (block.chainid == 534352);
+        bool isOptimism = (block.chainid == 10);
         uint128 enforceGas = uint128(500_000);
         uint128 lzReceiveGasLimit = uint128(170_000);
         address owner = msg.sender;
@@ -42,25 +42,25 @@ contract DeployAndConfigureOApps is Script, Utils {
 
         vm.startBroadcast();
 
-        if (isScroll) {
-            L2BeHYPEOAppStaker l2Impl = new L2BeHYPEOAppStaker(cfg.readAddress(".layerZero.scroll.endpoint"));
+        if (isOptimism) {
+            L2BeHYPEOAppStaker l2Impl = new L2BeHYPEOAppStaker(cfg.readAddress(".layerZero.optimism.endpoint"));
             l2BeHYPEOAppStaker = _deployL2OAppStaker(address(l2Impl), owner, enforceGas, lzReceiveGasLimit);
 
             if (l2BeHYPEOAppStaker != l2BeHYPEOAppStakerAddress) {
                 revert("L2BeHYPEOAppStaker is not the same as l1BeHYPEOAppStakerAddress");
             }
 
-            address scrollEndpoint = cfg.readAddress(".layerZero.scroll.endpoint");
+            address optimismEndpoint = cfg.readAddress(".layerZero.optimism.endpoint");
             uint32 dstEid = uint32(cfg.readUint(".layerZero.hyperEVM.eid"));
             L2BeHYPEOAppStaker(l2BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(l1BeHYPEOAppStakerAddress))));
             
             _setDVN(
                 dstEid,
-                scrollEndpoint,
-                cfg.readAddress(".layerZero.scroll.send302"),
-                cfg.readAddress(".layerZero.scroll.receive302"),
-                cfg.readAddress(".layerZero.scroll.nevermindDvn"),
-                cfg.readAddress(".layerZero.scroll.layerZeroDvn"),
+                optimismEndpoint,
+                cfg.readAddress(".layerZero.optimism.send302"),
+                cfg.readAddress(".layerZero.optimism.receive302"),
+                cfg.readAddress(".layerZero.optimism.nevermindDvn"),
+                cfg.readAddress(".layerZero.optimism.layerZeroDvn"),
                 address(l2BeHYPEOAppStaker)
             );
             
@@ -73,7 +73,7 @@ contract DeployAndConfigureOApps is Script, Utils {
             }
 
             address hyperEVMEndpoint = cfg.readAddress(".layerZero.hyperEVM.endpoint");
-            uint32 dstEid = uint32(cfg.readUint(".layerZero.scroll.eid"));
+            uint32 dstEid = uint32(cfg.readUint(".layerZero.optimism.eid"));
             L1BeHYPEOAppStaker(l1BeHYPEOAppStaker).setPeer(dstEid, bytes32(uint256(uint160(l2BeHYPEOAppStakerAddress))));
             
             _setDVN(

@@ -27,4 +27,4 @@ testnet = "${TESTNET_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_ETHERSCAN_KEY}", chain = 999 }
-scroll = { key = "${ETH_ETHERSCAN_KEY}", chain = 534352 }
+optimism = { key = "${ETH_ETHERSCAN_KEY}", chain = 10 }
