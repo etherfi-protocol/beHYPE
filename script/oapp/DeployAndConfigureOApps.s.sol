@@ -63,7 +63,11 @@ contract DeployAndConfigureOApps is Script, Utils {
                 cfg.readAddress(".layerZero.optimism.layerZeroDvn"),
                 address(l2BeHYPEOAppStaker)
             );
-            
+
+            address opController = cfg.readAddress(".roles.optimismController");
+            L2BeHYPEOAppStaker(l2BeHYPEOAppStaker).setDelegate(opController);
+            L2BeHYPEOAppStaker(l2BeHYPEOAppStaker).transferOwnership(opController);
+
         } else {
             L1BeHYPEOAppStaker l1Impl = new L1BeHYPEOAppStaker(cfg.readAddress(".layerZero.hyperEVM.endpoint"));
             l1BeHYPEOAppStaker = _deployL1OAppStaker(address(l1Impl), owner);
